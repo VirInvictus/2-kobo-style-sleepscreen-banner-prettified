@@ -24,6 +24,7 @@ Everything sits inside an opaque, rounded, shadowed card. The card is drawn once
 - KOReader (reasonably recent; the patch carries a compatibility shim for versions older than `v2025.04-115`).
 - A device where you can drop files into `koreader/patches/` (Kobo, Kindle with a KOReader install, PocketBook, reMarkable, Android, etc.).
 - The screensaver configured to use the banner message over a cover image (see below).
+- The fonts named in the default config. As shipped it expects **Libron** from the [ebook-fonts](https://github.com/nicoverbruggen/ebook-fonts) collection (see [Fonts](#fonts)). Any font already on your device works too; you just change the config.
 
 ## Installation
 
@@ -96,7 +97,13 @@ All options live in the two tables at the top of the `.lua` file. Edit, save, re
 
 ## Fonts
 
-The default configuration references **Libron** (a serif) from the ebook-fonts collection for the title, quote, and footer, and leaves the page counter on `cfont` so it inherits your KOReader UI font. If you do not have those fonts installed, change the `*_fontFace` values to fonts you do have (any filename in a KOReader font path works, as does an alias like `cfont` or `NotoSerif-Regular.ttf`).
+**This fork's default config depends on the [ebook-fonts](https://github.com/nicoverbruggen/ebook-fonts) collection.** It uses the serif **Libron** for the title, quote, and footer, and leaves the page counter on `cfont` so it inherits your KOReader UI font. Specifically it expects these three files to be somewhere KOReader scans for fonts (for example `koreader/fonts/`):
+
+- `Libron-Bold.ttf` (title)
+- `Libron-Italic.ttf` (highlight quote)
+- `Libron-Regular.ttf` (highlight footer)
+
+Grab them from the ebook-fonts release (they live under `fonts/core/`). If you would rather not install them, change the `title_fontFace`, `highlight_fontFace`, and `hl_footer_fontFace` values to fonts you already have. Any filename in a KOReader font path works, as does an alias like `cfont` or `NotoSerif-Regular.ttf`. Nothing else in the patch depends on ebook-fonts.
 
 ## How it works
 
