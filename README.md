@@ -106,6 +106,7 @@ The patch wraps `UIManager:show`. When the widget being shown is the screensaver
 
 - Original banner patch: Discord user **@sandcastles**.
 - Design cues borrowed from a similar patch by Reddit user **u/juancoquet**.
+- Distributed through the KOReader plugin app store, which credited the **zenixlabs** repository as the source. That GitHub repository has since been removed; this fork was made from the app-store copy.
 - Prettified fork (floating-card design, font wiring): **VirInvictus**.
 
 ## License
