@@ -110,4 +110,6 @@ The patch wraps `UIManager:show`. When the widget being shown is the screensaver
 
 ## License
 
-This is a derivative work built on the original community patch above and on KOReader (AGPL-3.0). The original patch shipped without a stated license; credits are preserved in the source header. If you reuse or redistribute, keep the attribution intact and check with the upstream authors.
+Licensed under the **GNU Affero General Public License v3.0** (AGPL-3.0), matching KOReader, on which this patch depends. See [`LICENSE`](LICENSE) for the full text.
+
+This is a derivative of an earlier community patch (see [Credits](#credits)); that attribution is preserved in the source header. If you reuse or redistribute, keep the attribution intact.
