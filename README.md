@@ -112,7 +112,7 @@ The patch wraps `UIManager:show`. When the widget being shown is the screensaver
 ## Credits
 
 - Original patch: **zenixlabs**, from [koreader-frankenpatches-public](https://github.com/zenixlabs/koreader-frankenpatches-public) ([source file](https://github.com/zenixlabs/koreader-frankenpatches-public/blob/main/2-kobo-style-sleepscreen-banner.lua)). zenixlabs designed the Kobo-style banner and the random-highlight feature.
-- Written in collaboration with Discord user **@sandcastles**.
+- Written in collaboration with Discord user **@sandcastles**. (the original, not this one)
 - Design cues borrowed from a similar patch by Reddit user **u/juancoquet**.
 - Distributed through the KOReader plugin app store, which pointed at the zenixlabs repo.
 - Prettified fork (floating-card design, font wiring): **VirInvictus**.
