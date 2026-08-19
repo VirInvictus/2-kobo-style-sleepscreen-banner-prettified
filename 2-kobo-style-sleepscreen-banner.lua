@@ -2,8 +2,8 @@
 --redesigns the inbuilt 'banner' type sleep screen message to
 --make it look like the kobo lockscreen tag.
 
---[ v2.0.2 ]
---crash guard when uiman:show() called w/o widget
+--[ v2.0.3 ]
+--prevent longest word breaking text bounds
 
 --CREDITS
 --this version was written in collab with discord user @sandcastles.
@@ -205,6 +205,23 @@ local function parseFooterText(text, index)
 	return text	
 end
 
+local function getMaxWordWidth(text, font_face)
+	local max_w = 0
+	if not text or text == "" then return max_w end
+	text = text:gsub("\\n", "\n")
+	for word in text:gmatch("%S+") do
+		local wgt = TextWidget:new{
+			padding = 0,
+			text = word,
+			face = font_face,
+		}
+		local w = wgt:getSize().w
+		if w > max_w then max_w = w end
+		wgt:free()
+	end
+	return max_w
+end
+
 local og_uiMan_show = UIManager.show
 
 function UIManager:show(widget, ...)
@@ -333,6 +350,37 @@ function UIManager:show(widget, ...)
 								HL_SETT.hl_footer_text and 
 								util.trim(HL_SETT.hl_footer_text) ~= ""
 	
+	-- Pre-calculate texts to expand max_wid if a word is too long
+	local title_text
+	
+	if self.ui and self.ui.document and self.ui.toc and self.ui.bookinfo then
+		title_text = self.ui and self.ui.bookinfo:expandString(B_SETT.title_text, last_file) or "N/A"
+	else
+		title_text = BookInfo:expandString(B_SETT.title_text, last_file) or "N/A"
+	end
+	
+	local random_highlight, random_highlight_index, footer_text_parsed
+	if highlightEnabled then 
+		if highlightCount == 1 then
+			random_highlight = highlights_list and highlights_list[1] and highlights_list[1].text or ""
+			random_highlight_index = 1
+		else
+			random_highlight_index = math.random(highlightCount)
+			while random_highlight_index == cached_random_highlight_index do 
+				random_highlight_index = math.random(highlightCount)
+			end
+			cached_random_highlight_index = random_highlight_index
+			random_highlight = highlights_list[random_highlight_index] and highlights_list[random_highlight_index].text or ""
+		end
+		
+		random_highlight = util.trim(random_highlight)
+		random_highlight = HL_SETT.add_quotations and addQuotesIfReq(random_highlight) or random_highlight
+		
+		if hl_footer_enabled then
+			footer_text_parsed = parseFooterText(HL_SETT.hl_footer_text, random_highlight_index)
+		end
+	end
+
 	local max_wid
 	if not highlightEnabled then
 		max_wid = B_SETT.max_width_hl_off and
@@ -348,7 +396,22 @@ function UIManager:show(widget, ...)
 					(B_SETT.max_width_hl_on/100 * screen_w) or 
 					screen_w * 0.6
 		max_wid = max_wid - overflow_w_hl
-	end			
+	end	
+	
+	-- Expand max_wid if any word is longer than the configured width
+	max_wid = math.max(max_wid, getMaxWordWidth(title_text, font_.title_font))
+	max_wid = math.max(max_wid, getMaxWordWidth(orig_sleep_text, font_.stats_font))
+	if highlightEnabled then
+		max_wid = math.max(max_wid, getMaxWordWidth(random_highlight, font_.highlight_font))
+		if hl_footer_enabled and footer_text_parsed then
+			max_wid = math.max(max_wid, getMaxWordWidth(footer_text_parsed, font_.footer_font) + getMaxWordWidth("— ", font_.footer_font))
+		end
+	end
+	
+	-- Ensure max_wid doesn't exceed screen width (minus overflow padding)
+	local absolute_max = highlightEnabled and (screen_w - overflow_w_hl) or (screen_w - overflow_w)
+	max_wid = math.min(max_wid, absolute_max)
+	
 	local max_height = B_SETT.max_height >= 20 and
 						B_SETT.max_height <= 100 and
 						(B_SETT.max_height/100 * screen_h) or 
@@ -356,14 +419,6 @@ function UIManager:show(widget, ...)
 	max_height = max_height - overflow_h							
 	
 	--TITLE WIDGET
-	local title_text
-	
-	if self.ui and self.ui.document and self.ui.toc and self.ui.bookinfo then
-		title_text = self.ui and self.ui.bookinfo:expandString(B_SETT.title_text, last_file) or "N/A"
-	else
-		title_text = BookInfo:expandString(B_SETT.title_text, last_file) or "N/A"
-	end
-	
 	local title_widget = buildTextField(
 							title_text, 
 							font_.title_font, 
@@ -386,28 +441,6 @@ function UIManager:show(widget, ...)
 	local highlight_widget
 	
 	if highlightEnabled then 
-		local random_highlight, random_highlight_index
-		
-		if highlightCount == 1 then
-			random_highlight = highlights_list and highlights_list[1] and 
-								highlights_list[1].text or ""
-			random_highlight_index = 1
-		else
-			random_highlight_index = math.random(highlightCount)
-			
-			--get a diff random highlight from prev time.
-			while random_highlight_index == cached_random_highlight_index do 
-				random_highlight_index = math.random(highlightCount)
-			end
-			cached_random_highlight_index = random_highlight_index
-			random_highlight = highlights_list[random_highlight_index] and 
-								highlights_list[random_highlight_index].text or ""
-		end
-		
-		random_highlight = util.trim(random_highlight)
-		random_highlight = HL_SETT.add_quotations and addQuotesIfReq(random_highlight) or 
-							random_highlight
-		
 		local hl_footer_widget
 		local footer_color = B_SETT.background == 0 and 
 								Bb.COLOR_GRAY_4 or 
@@ -424,7 +457,7 @@ function UIManager:show(widget, ...)
 									footer_color
 			)						
 			hl_footer_widget = buildTextField(
-									parseFooterText(HL_SETT.hl_footer_text , random_highlight_index), 
+									footer_text_parsed, 
 									font_.footer_font, 
 									max_height - title_dimen.h - stats_dimen.h, 
 									max_wid - hyphen_wid:getSize().w, 
@@ -443,7 +476,7 @@ function UIManager:show(widget, ...)
 			}
 		end
 		
-		local hl_wgt_max_h = hl_footer_enabled and 
+		local hl_wgt_max_h = hl_footer_enabled and hl_footer_widget and 
 						(max_height - title_dimen.h - stats_dimen.h - hl_footer_widget:getSize().h) or 
 						(max_height - title_dimen.h - stats_dimen.h)
 		highlight_widget = buildTextField(
@@ -455,14 +488,6 @@ function UIManager:show(widget, ...)
 								true
 		)								
 		local accent_height = highlight_widget:getSize().h
-		
-		-- if hl_footer_enabled and hl_footer_widget then
-			-- highlight_widget = VerticalGroup:new{
-					-- align = "left",
-					-- highlight_widget,
-					-- hl_footer_widget,
-			-- }
-		-- end
 		
 		if HL_SETT.show_accent_line then 			
 			local highlight_accent = LineWidget:new{  
