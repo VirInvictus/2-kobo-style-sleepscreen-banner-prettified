@@ -127,8 +127,8 @@ This is a derivative of an earlier community patch (see [Credits](#credits)); th
 
 This is a prettified fork of zenixlabs' original patch (see [Credits](#credits)); please support the original author first. If this fork's useful to you and you'd like to chip in:
 
-```
-bc1qkge6zr45tzqfwfmvma2ylumt6mg7wlwmhr05yv
-```
-
-https://liberapay.com/bdkl/
+- liberapay · [liberapay.com/bdkl](https://liberapay.com/bdkl/)
+- bitcoin
+  ```
+  bc1qkge6zr45tzqfwfmvma2ylumt6mg7wlwmhr05yv
+  ```
