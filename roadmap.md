@@ -12,7 +12,7 @@ This roadmap tracks the development phases for turning the static user patch int
 - [x] **Implement 'Pill / Badge' Style:** Radius computed from the assembled card's height (`radius = height / 2`); the drop shadow follows the same radius.
 - [x] **Implement 'Full-Width' Style:** Card stretched to `screen_w` via a `LeftContainer`, zero margins, square corners, no shadow; text uses all the width the chrome leaves over (`max_width_hl_*` percentages don't apply in this style).
 - [x] **Implement 'Outlined' Style:** User background and corner radius kept, thick 3 px border, drop shadow removed.
-- [x] **Implement 'Bracketed' Style:** `FrameContainer` replaced entirely by a `VerticalGroup` sandwiched between two horizontal `LineWidget`s (2 px rules, 8 px gap, inked like the text).
+- [x] **Implement 'Bracketed' Style:** shipped in v2.1.0 as typographic rules above/below the text; redesigned in v2.1.2 as **"Flat box"** (menu label) — a plain solid backing behind the text, no border, corners or shadow, which reads far better over real covers. Settings id unchanged.
 
 ## Phase 2: Robust Highlight Handling ✅ — shipped in v2.1.0
 *Context: Refining the aesthetic behavior when edge cases in book metadata or reading history occur.*
@@ -21,4 +21,4 @@ This roadmap tracks the development phases for turning the static user patch int
 
 ## Testing
 
-`test/harness.lua` stubs KOReader's widget modules and exercises the patch headlessly: menu hooking and injection, style persistence and fallback, `UIManager:show` pass-through guards, and per-style card assembly with layout assertions (43 checks). Run it with Lua 5.4 or LuaJIT: `lua test/harness.lua`. On-device visual verification per style is still worthwhile.
+`test/harness.lua` stubs KOReader's widget modules and exercises the patch headlessly: order-table menu registration, style persistence and fallback, `UIManager:show` pass-through guards, per-style card assembly with layout assertions, and draw-time font resolution (56 checks). Run it under **both** Lua 5.4 and LuaJIT: `lua test/harness.lua`. On-device visual verification per style is still worthwhile.
