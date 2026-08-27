@@ -2,14 +2,23 @@
 --redesigns the inbuilt 'banner' type sleep screen message to
 --make it look like the kobo lockscreen tag.
 
---[ v2.0.3 ]
---prevent longest word breaking text bounds
+--[ v2.1.0 ]
+--selectable banner styles: floating card (classic), pill, full width,
+--outlined and bracketed. pick one under Settings > Screen > Sleep Screen
+--> Banner style (applies from the next sleep, no restart needed), or set
+--a default with the new 'style' key in B_SETT below.
+--a book with no highlights now skips the highlight section entirely
 
 --CREDITS
 --this version was written in collab with discord user @sandcastles.
 --i've also borrowed some design cues from a similar patch written by reddit user u/juancoquet.
 
 local B_SETT = {	--BANNER SETTINGS
+					style = "floating_card",	--default banner style until
+												--changed in the sleep screen
+												--menu. one of: "floating_card",
+												--"pill", "full_width",
+												--"outlined", "bracketed"
 					title_text = "%T", 	--configure title_text like you'd configure the inbuilt 
 										--sleep screen message. for eg, "%T" shows book title,
 										--"page %c of %t" shows 'page 1 of 400' etc.
@@ -83,6 +92,145 @@ local VerticalSpan = require("ui/widget/verticalspan")
 local screen_w, screen_h = Screen:getWidth(), Screen:getHeight()
 local cached_random_highlight_index  = 1
 local Sidecar
+
+--==================================================================
+-- BANNER STYLES (v2.1.0)
+-- Each style is a set of chrome parameters used when the card is
+-- assembled at the bottom of UIManager:show. The user's pick (made
+-- in Settings > Screen > Sleep Screen > Banner style) is stored in
+-- G_reader_settings and wins over B_SETT.style.
+--==================================================================
+local _ = _ or function(str) return str end
+
+local STYLE_DEFS = {
+	floating_card = {		-- the classic prettified look
+			frame = true,
+			shadow = B_SETT.shadow_enabled,
+			padding = B_SETT.padding or 15,
+			margin = B_SETT.margin or 10,
+			border_size = B_SETT.border_size or 1,
+			radius = B_SETT.corner_radius or 0,
+	},
+	pill = {				-- fully rounded lozenge
+			frame = true,
+			shadow = B_SETT.shadow_enabled,
+			padding = B_SETT.padding or 15,
+			margin = B_SETT.margin or 10,
+			border_size = B_SETT.border_size or 1,
+			radius_from_height = true,	-- radius = card height / 2
+	},
+	full_width = {			-- classic edge-to-edge banner
+			frame = true,
+			span_screen = true,			-- stretch the card across screen_w
+			shadow = false,
+			padding = B_SETT.padding or 15,
+			margin = 0,					-- flush against the screen edges
+			border_size = B_SETT.border_size or 1,
+			radius = 0,
+	},
+	outlined = {			-- ghost card, no shadow
+			frame = true,
+			shadow = false,
+			padding = B_SETT.padding or 15,
+			margin = B_SETT.margin or 10,
+			border_size = 3,			-- thick border
+			radius = B_SETT.corner_radius or 0,
+	},
+	bracketed = {			-- typographic rules, no card at all
+			frame = false,
+			shadow = false,
+			padding = 0,
+			margin = B_SETT.margin or 10,
+			border_size = 0,
+			radius = 0,
+	},
+}
+
+local BANNER_STYLE_ITEMS = {
+	{ id = "floating_card",	text = _("Floating card"),	help_text = _("Rounded card with a hard offset drop shadow (default).") },
+	{ id = "pill",			text = _("Pill"),			help_text = _("Fully rounded lozenge floating over the cover.") },
+	{ id = "full_width",	text = _("Full width"),		help_text = _("Classic banner spanning the whole screen, flush against the edges, no shadow.") },
+	{ id = "outlined",		text = _("Outlined"),		help_text = _("Minimal ghost card: thick border, no drop shadow.") },
+	{ id = "bracketed",		text = _("Bracketed"),		help_text = _("Typographic rules above and below the text instead of a card.") },
+}
+
+local function getBannerStyle()
+	-- menu choice first, then the B_SETT default, then floating card
+	local style = G_reader_settings:readSetting("screensaver_banner_style")
+	if not STYLE_DEFS[style] then
+		style = B_SETT.style
+	end
+	if not STYLE_DEFS[style] then
+		style = "floating_card"
+	end
+	return style
+end
+
+--------------------------------------------------------------------
+-- Settings menu integration. The stock "Sleep screen" submenu is
+-- rebuilt by KOReader every time the menu opens (the menu modules
+-- dofile an elements table), so we wrap setUpdateItemTable on both
+-- menu modules and slip a "Banner style" picker into the fresh
+-- table on each build. Unlike plugins, these modules are loaded
+-- via require, so a monkey-patch reliably sticks.
+--------------------------------------------------------------------
+local function injectBannerStyleEntry(menu_items)
+	local sleep_entry = menu_items and (menu_items.screensaver or menu_items.screen_saver)
+	local sub_item_table = sleep_entry and sleep_entry.sub_item_table
+	if not sub_item_table or sub_item_table.banner_style_entry then
+		return
+	end
+	local style_items = {}
+	for _, item in ipairs(BANNER_STYLE_ITEMS) do
+		table.insert(style_items, {
+				text = item.text,
+				help_text = item.help_text,
+				checked_func = function()
+					return getBannerStyle() == item.id
+				end,
+				callback = function()
+					G_reader_settings:saveSetting("screensaver_banner_style", item.id)
+				end,
+				radio = true,
+		})
+	end
+	local banner_style_entry = {
+			text = _("Banner style"),
+			help_text = _("Look of the message banner drawn over the sleep screen wallpaper."),
+			sub_item_table = style_items,
+	}
+	-- place right after the "Sleep screen message" section when found
+	local at
+	for idx, entry in ipairs(sub_item_table) do
+		if entry.text == _("Sleep screen message") then
+			at = idx + 1
+			break
+		end
+	end
+	if at then
+		table.insert(sub_item_table, at, banner_style_entry)
+	else
+		table.insert(sub_item_table, banner_style_entry)
+	end
+	sub_item_table.banner_style_entry = true
+end
+
+local function hookSleepScreenMenu(module_path)
+	pcall(function()
+		local menu_module = require(module_path)
+		if not menu_module or not menu_module.setUpdateItemTable then
+			return
+		end
+		local og_setUpdateItemTable = menu_module.setUpdateItemTable
+		menu_module.setUpdateItemTable = function(self, ...)
+			og_setUpdateItemTable(self, ...)
+			pcall(injectBannerStyleEntry, self.menu_items)
+		end
+	end)
+end
+
+hookSleepScreenMenu("apps/reader/modules/readermenu")
+hookSleepScreenMenu("apps/filemanager/filemanagermenu")
 
 local function buildTextField(
 								text, 
@@ -264,33 +412,43 @@ function UIManager:show(widget, ...)
 				require("apps/filemanager/filemanager").instance
 	Sidecar:flush()
 	
-	--dimen roundup	
+	--dimen roundup. the active banner style resolves the card chrome
+	--(padding, margin, border, radius) before anything is laid out.
+	local style = STYLE_DEFS[getBannerStyle()]
+	
 	local dimen_ = {
-			padding = B_SETT.padding and 
-						Screen:scaleBySize(B_SETT.padding) or 
-						Screen:scaleBySize(15),
-			margin = B_SETT.margin and 
-						Screen:scaleBySize(B_SETT.margin) or 
-						Screen:scaleBySize(10),
-			border_size = B_SETT.border_size and 
-						Screen:scaleBySize(B_SETT.border_size) or 
-						Screen:scaleBySize(1),
+			padding = style.frame and Screen:scaleBySize(style.padding) or 0,
+			margin = Screen:scaleBySize(style.margin),
+			border_size = style.frame and Screen:scaleBySize(style.border_size) or 0,
 			line_width = Screen:scaleBySize(1),
 			line_clearance = Size.padding.large,
 			hl_wgt_clearance = Screen:scaleBySize(15),
 			footer_clearance = Screen:scaleBySize(5),
-			corner_radius = B_SETT.corner_radius and
-						Screen:scaleBySize(B_SETT.corner_radius) or 0,
+			corner_radius = style.radius and
+							Screen:scaleBySize(style.radius) or 0,
 			shadow_offset = B_SETT.shadow_offset and
-						Screen:scaleBySize(B_SETT.shadow_offset) or
-						Screen:scaleBySize(6),
+							Screen:scaleBySize(B_SETT.shadow_offset) or
+							Screen:scaleBySize(6),
+			rule_width = Screen:scaleBySize(2),	--bracketed style rules
+			rule_gap = Screen:scaleBySize(8),	--bracketed style text gap
 	}
-
-	local overflow_h = (dimen_.padding + dimen_.margin + dimen_.border_size) * 2 + 
+	
+	--vertical/horizontal chrome the style wraps around the text, used
+	--to keep the card within the configured max width and height
+	local chrome_v, chrome_h
+	if style.frame then
+		chrome_v = dimen_.padding + dimen_.margin + dimen_.border_size
+		chrome_h = chrome_v
+	else
+		chrome_v = dimen_.margin + dimen_.rule_gap + dimen_.rule_width
+		chrome_h = dimen_.margin
+	end
+	
+	local overflow_h = chrome_v * 2 +
 							dimen_.hl_wgt_clearance
-	local overflow_w = (dimen_.padding + dimen_.margin + dimen_.border_size) * 2	
-	local overflow_w_hl = HL_SETT.show_accent_line and 
-							(overflow_w + dimen_.line_clearance + dimen_.line_width) or 
+	local overflow_w = chrome_h * 2
+	local overflow_w_hl = HL_SETT.show_accent_line and
+							(overflow_w + dimen_.line_clearance + dimen_.line_width) or
 							overflow_w
 	
 	--font roundup
@@ -382,7 +540,13 @@ function UIManager:show(widget, ...)
 	end
 
 	local max_wid
-	if not highlightEnabled then
+	if style.span_screen then
+		--full-width style: the card stretches across the screen anyway,
+		--so let the text use all the room the chrome leaves over
+		max_wid = highlightEnabled and
+					(screen_w - overflow_w_hl) or
+					(screen_w - overflow_w)
+	elseif not highlightEnabled then
 		max_wid = B_SETT.max_width_hl_off and
 					B_SETT.max_width_hl_off >= 20 and 
 					B_SETT.max_width_hl_off <= 100 and
@@ -396,7 +560,7 @@ function UIManager:show(widget, ...)
 					(B_SETT.max_width_hl_on/100 * screen_w) or 
 					screen_w * 0.6
 		max_wid = max_wid - overflow_w_hl
-	end	
+	end
 	
 	-- Expand max_wid if any word is longer than the configured width
 	max_wid = math.max(max_wid, getMaxWordWidth(title_text, font_.title_font))
@@ -440,7 +604,11 @@ function UIManager:show(widget, ...)
 	--HIGHLIGHTS WIDGET
 	local highlight_widget
 	
-	if highlightEnabled then 
+	--phase 2: if the parser came up empty (book has no highlights, or
+	--an empty string slipped through), skip the highlight section
+	--entirely instead of rendering an empty accent line with a blank
+	--space next to it.
+	if highlightEnabled and random_highlight and random_highlight ~= "" then 
 		local hl_footer_widget
 		local footer_color = B_SETT.background == 0 and 
 								Bb.COLOR_GRAY_4 or 
@@ -525,31 +693,78 @@ function UIManager:show(widget, ...)
 		table.insert(content_widget, highlight_widget)
 	end
 	
-	-- the card itself (margin moved out to leading spans below so the
-	-- drop shadow has room to peek past the card's bottom-right edge).
-	local card = FrameContainer:new{
-		background = B_SETT.background == 0 and Bb.COLOR_WHITE or
-					 Bb.COLOR_BLACK,
-		color = B_SETT.border_color == 0 and Bb.COLOR_WHITE or
-				Bb.COLOR_BLACK,
-		radius = dimen_.corner_radius,
-		margin = 0,
-		bordersize = dimen_.border_size,
-		padding = dimen_.padding,
-		content_widget,
-	}
+	-- the card itself. the style decides whether we draw a framed card
+	-- (floating card, pill, full width, outlined) or a bare typographic
+	-- bracket. margin stays out in the leading spans below so the drop
+	-- shadow has room to peek past the card's bottom-right edge.
+	local card
+	if style.frame then
+		local card_inner = content_widget
+		if style.span_screen then
+			-- stretch the content group to the full screen width so the
+			-- FrameContainer ends up spanning screen_w, edge to edge.
+			local content_size = content_widget:getSize()
+			card_inner = LeftContainer:new{
+					dimen = Geom:new{
+						w = screen_w - 2 * (dimen_.padding + dimen_.border_size),
+						h = content_size.h,
+					},
+					content_widget,
+			}
+		end
+		card = FrameContainer:new{
+			background = B_SETT.background == 0 and Bb.COLOR_WHITE or
+						 Bb.COLOR_BLACK,
+			color = B_SETT.border_color == 0 and Bb.COLOR_WHITE or
+					Bb.COLOR_BLACK,
+			radius = dimen_.corner_radius,
+			margin = 0,
+			bordersize = dimen_.border_size,
+			padding = dimen_.padding,
+			content_widget = card_inner,
+		}
+		if style.radius_from_height then
+			-- pill: round the card into a lozenge once its height is known
+			card.radius = math.floor(card:getSize().h / 2)
+		end
+	else
+		-- bracketed: sandwich the content between two horizontal rules
+		local ink = B_SETT.background == 1 and Bb.COLOR_WHITE or Bb.COLOR_BLACK
+		local content_w = content_widget:getSize().w
+		if content_w < 1 then content_w = 1 end
+		card = VerticalGroup:new{
+			align = "left",
+			LineWidget:new{
+							background = ink,
+							dimen = Geom:new{
+								w = content_w,
+								h = dimen_.rule_width,
+							},
+			},
+			VerticalSpan:new{width = dimen_.rule_gap},
+			content_widget,
+			VerticalSpan:new{width = dimen_.rule_gap},
+			LineWidget:new{
+							background = ink,
+							dimen = Geom:new{
+								w = content_w,
+								h = dimen_.rule_width,
+							},
+			},
+		}
+	end
 
 	-- composite a hard offset drop shadow behind the card so it reads
 	-- as a card floating above the cover.
 	local card_layer = card
-	if B_SETT.shadow_enabled then
+	if style.frame and style.shadow and B_SETT.shadow_enabled then
 		local csize = card:getSize()
 		local off = dimen_.shadow_offset
 		local shadow_gray = Bb["COLOR_GRAY_" .. B_SETT.shadow_gray_level] or
 							Bb.COLOR_GRAY_4
 		local shadow_box = FrameContainer:new{
 			background = shadow_gray,
-			radius = dimen_.corner_radius,
+			radius = card.radius,
 			bordersize = 0,
 			margin = 0,
 			padding = 0,

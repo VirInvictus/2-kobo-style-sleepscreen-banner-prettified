@@ -6,6 +6,7 @@ This is a *prettified* fork of an existing community patch. It keeps the origina
 
 - A **floating-card visual identity**: rounded corners plus a hard offset drop shadow, so the card reads as a tag sitting above the cover rather than a flat box.
 - **Per-element font control**, wired for the [ebook-fonts](https://github.com/nicoverbruggen/ebook-fonts) collection out of the box (serif title and quote, a legible sans for the page counter).
+- **Selectable banner styles**: the floating card, a pill, a full-width banner, an outlined ghost card, and a bracketed typographic look — pick one in the Sleep Screen settings, no restart needed.
 
 See [Credits](#credits) for the original authors.
 
@@ -57,6 +58,7 @@ All options live in the two tables at the top of the `.lua` file. Edit, save, re
 
 | Key | Default | Meaning |
 | --- | --- | --- |
+| `style` | `"floating_card"` | Default banner style (see [Banner styles](#banner-styles)). Used until you pick a style in the Sleep Screen settings menu, which then takes precedence. |
 | `title_text` | `"%T"` | Big title line. Accepts the same tokens as the KOReader sleep message (`%T`, `%A`, `%c`, `%t`, ...). |
 | `title_fontFace` | `"Libron-Bold.ttf"` | Font for the title. A bare filename, or a KOReader alias like `cfont`. |
 | `title_fontSize` | `30` | |
@@ -74,6 +76,18 @@ All options live in the two tables at the top of the `.lua` file. Edit, save, re
 | `shadow_enabled` | `true` | Draw the floating drop shadow. |
 | `shadow_offset` | `6` | How far the shadow peeks past the bottom-right edge (px). |
 | `shadow_gray_level` | `5` | Shadow tone, `COLOR_GRAY` level `1` (dark) to `9` (light). |
+
+### Banner styles
+
+Pick a style under **Settings → Screen → Sleep screen → Banner style** (it shows up in the file browser's settings too). The choice is saved with KOReader's settings and applies from the next sleep — no restart needed. If you have never picked one there, the `style` value in `B_SETT` is used instead.
+
+| Style | Look |
+| --- | --- |
+| `floating_card` | The classic prettified look: rounded corners plus the hard offset drop shadow. |
+| `pill` | A fully rounded lozenge — the radius is computed from the card's height, so it stays a perfect pill however tall the text is. Keeps the shadow. |
+| `full_width` | The classic banner: spans the whole screen width flush against the edges, square corners, no shadow. `max_width_hl_off` / `max_width_hl_on` don't apply in this style; the text simply uses all the width the card has. |
+| `outlined` | A ghost card: your usual background and corner radius, but a thick 3 px border and no drop shadow. |
+| `bracketed` | Pure typography: no card at all, just two horizontal rules above and below the text (2 px rules, 8 px gap, inked like the text). The vertical accent line beside the highlight still works. |
 
 ### Highlights (`HL_SETT`)
 
@@ -108,6 +122,8 @@ Grab them from the ebook-fonts release (they live under `fonts/core/`). If you w
 ## How it works
 
 The patch wraps `UIManager:show`. When the widget being shown is the screensaver, and the current settings match the banner-over-cover case, it walks into the screensaver's message container, rebuilds the message as a framed card (title, stats, and optional highlight widgets), composites a drop shadow behind it with an `OverlapGroup`, and hands the result back to the original `show`. In every other case it calls straight through, so nothing else is affected.
+
+It also hooks the settings menu. KOReader rebuilds the Sleep screen submenu every time the menu opens, so the patch wraps `setUpdateItemTable` on the reader and file browser menu modules and slips a **Banner style** radio picker into the fresh submenu each time. That picker needs a reasonably recent KOReader (one with the current Sleep screen menu); on older installs the patch keeps working, just with the file-configured `style`.
 
 ## Credits
 
