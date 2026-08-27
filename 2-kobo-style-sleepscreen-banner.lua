@@ -721,7 +721,7 @@ function UIManager:show(widget, ...)
 			margin = 0,
 			bordersize = dimen_.border_size,
 			padding = dimen_.padding,
-			content_widget = card_inner,
+			card_inner,	--positional child: FrameContainer reads self[1]
 		}
 		if style.radius_from_height then
 			-- pill: round the card into a lozenge once its height is known

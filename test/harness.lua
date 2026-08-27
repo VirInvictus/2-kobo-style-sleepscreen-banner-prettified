@@ -47,7 +47,8 @@ local HorizontalGroup = mkclass("horizontalgroup", function(self) return sumChil
 local VerticalSpan    = mkclass("verticalspan", function(self) return { w = 0, h = self.width or 0 } end)
 local HorizontalSpan  = mkclass("horizontalspan", function(self) return { w = self.width or 0, h = 0 } end)
 local FrameContainer  = mkclass("framecontainer", function(self)
-  local cs = self.content_widget and self.content_widget:getSize() or { w = 0, h = 0 }
+  -- match the real widget: child is the positional self[1]
+  local cs = self[1] and self[1]:getSize() or { w = 0, h = 0 }
   local pad = (self.padding or 0) + (self.bordersize or 0)
   return { w = cs.w + 2 * pad, h = cs.h + 2 * pad }
 end)
@@ -261,8 +262,8 @@ do
   ok(card._kind == "framecontainer", "framed card")
   ok(layer.dimen.w == card:getSize().w + 6 and layer.dimen.h == card:getSize().h + 6, "shadow offset 6px peek")
   ok(card.radius == 8, "floating card radius from B_SETT (8)")
-  ok(card.content_widget._kind == "verticalgroup", "content is a vertical group")
-  ok(#card.content_widget == 4, "title+stats+span+highlight (4 children)")
+  ok(card[1]._kind == "verticalgroup", "content is a vertical group")
+  ok(#card[1] == 4, "title+stats+span+highlight (4 children)")
   ok(card:getSize().w <= 1000, "card fits the screen")
 end
 
@@ -287,7 +288,7 @@ do
   ok(layer._kind == "framecontainer", "no shadow layer for full width")
   ok(layer:getSize().w == 1000, "card spans exactly screen_w (got " .. tostring(layer:getSize().w) .. ")")
   ok(layer.radius == 0, "square corners")
-  local inner = layer.content_widget
+  local inner = layer[1]
   ok(inner._kind == "leftcontainer", "content stretched via LeftContainer")
   ok(inner.dimen.w == 1000 - 2 * (15 + 1), "inner width = screen_w minus chrome")
 end
@@ -321,11 +322,11 @@ do
   sidecar._annotations = {}
   local w, cp = makeWidget()
   UIManager:show(w)
-  ok(#cp.widget[2][2][2].content_widget == 2, "no highlight section when book has none")
+  ok(#cp.widget[2][2][2][1] == 2, "no highlight section when book has none")
   sidecar._annotations = { { text = "   ", drawer = "underscore" } }
   w, cp = makeWidget()
   UIManager:show(w)
-  ok(#cp.widget[2][2][2].content_widget == 2, "empty-text highlight skipped")
+  ok(#cp.widget[2][2][2][1] == 2, "empty-text highlight skipped")
 end
 
 print(string.format("\n%d passed, %d failed", PASS, FAIL))
