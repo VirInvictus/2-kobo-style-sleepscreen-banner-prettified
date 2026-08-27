@@ -2,11 +2,16 @@
 --redesigns the inbuilt 'banner' type sleep screen message to
 --make it look like the kobo lockscreen tag.
 
+--[ v2.1.1 ]
+--menu registration fixed: Banner style now lives at the bottom of the
+--Settings tab (order-table aware, same approach as the ui-font patch)
+--banner fonts are menu-selectable (title/stats/highlight/footer), no
+--more hard-coded font filenames to get wrong
 --[ v2.1.0 ]
 --selectable banner styles: floating card (classic), pill, full width,
---outlined and bracketed. pick one under Settings > Screen > Sleep Screen
---> Banner style (applies from the next sleep, no restart needed), or set
---a default with the new 'style' key in B_SETT below.
+--outlined and bracketed. configure under Settings > Banner style
+--(applies from the next sleep, no restart needed), or set defaults
+--with the 'style' key in B_SETT below.
 --a book with no highlights now skips the highlight section entirely
 
 --CREDITS
@@ -22,7 +27,7 @@ local B_SETT = {	--BANNER SETTINGS
 					title_text = "%T", 	--configure title_text like you'd configure the inbuilt 
 										--sleep screen message. for eg, "%T" shows book title,
 										--"page %c of %t" shows 'page 1 of 400' etc.
-					title_fontFace = "Libron-Bold.ttf",
+					title_fontFace = "Libron_R-Bold.ttf",
 					title_fontSize = 30,
 					stats_fontFace = "cfont",
 					stats_fontSize = 17,
@@ -41,13 +46,13 @@ local B_SETT = {	--BANNER SETTINGS
 }
 local HL_SETT = {	--HIGHLIGHT SETTINGS
 					showRandomHighlight = true, 
-					highlight_fontFace = "Libron-Italic.ttf",
+					highlight_fontFace = "Libron_R-Italic.ttf",
 					highlight_fontSize = 16,
 					justify = true,
 					add_quotations = true,
 					show_accent_line = true,					
 					showHighlightFooter = true,
-					hl_footer_fontFace = "Libron-Regular.ttf",
+					hl_footer_fontFace = "Libron_R-Regular.ttf",
 					hl_footer_fontSize = 15,
 					hl_footer_text = "saved on %DT at %HM", 	
 										-- %DT = date, 
@@ -167,22 +172,69 @@ local function getBannerStyle()
 end
 
 --------------------------------------------------------------------
--- Settings menu integration. The stock "Sleep screen" submenu is
--- rebuilt by KOReader every time the menu opens (the menu modules
--- dofile an elements table), so we wrap setUpdateItemTable on both
--- menu modules and slip a "Banner style" picker into the fresh
--- table on each build. Unlike plugins, these modules are loaded
--- via require, so a monkey-patch reliably sticks.
+-- Fonts. KOReader's fontlist reports every font file it can see, as
+-- full paths, so we resolve by basename and never guess directories
+-- (collection layouts like fonts/relaxed-core-fonts/Libron_R-*.ttf
+-- just work). The menu persists a full path per role; B_SETT holds
+-- the defaults and 'cfont' is the last-resort fallback.
 --------------------------------------------------------------------
-local function injectBannerStyleEntry(menu_items)
-	local sleep_entry = menu_items and (menu_items.screensaver or menu_items.screen_saver)
-	local sub_item_table = sleep_entry and sleep_entry.sub_item_table
-	if not sub_item_table or sub_item_table.banner_style_entry then
-		return
+local ok_fontlist, FontList = pcall(require, "fontlist")
+if not ok_fontlist or type(FontList) ~= "table" then FontList = nil end
+
+local FONT_PATHS = {}
+if FontList and type(FontList.fontlist) == "table" then
+	for _, path in ipairs(FontList.fontlist) do
+		if type(path) == "string" then
+			local base = path:match("([^/\\]+)$")
+			if base and not FONT_PATHS[base] then FONT_PATHS[base] = path end
+		end
 	end
-	local style_items = {}
+end
+
+local function resolveFontPath(name)
+	if not name or name == "" then return nil end
+	if name:find("/", 1, true) then return name end				--explicit path
+	if FONT_PATHS[name] then return FONT_PATHS[name] end		--discovered basename
+	if not name:find("%.tt[fc]$", 1, false) then return name end --KOReader alias (cfont, ...)
+	return nil													--filename we can't find anywhere
+end
+
+local function getFontFace(setting_key, config_name, size, fallback_alias, fallback_size)
+	local face = Font:getFace(resolveFontPath(G_reader_settings:readSetting(setting_key)) or
+							resolveFontPath(config_name) or
+							fallback_alias, size)
+	return face or Font:getFace(fallback_alias, fallback_size)
+end
+--------------------------------------------------------------------
+-- Settings menu integration. KOReader builds the menu by merging
+-- menu_items with an order table (MenuSorter) inside
+-- setUpdateItemTable; items missing from the order never reach the
+-- menu at all. Following the device-proven pattern of the ui-font
+-- patch: register a top-level key and slip it into the order table
+-- *before* the original builder runs.
+--------------------------------------------------------------------
+local T = require("ffi/util").template
+local BANNER_MENU_ID = "banner_style"
+
+local BANNER_FONT_ROLES = {
+	{ key = "screensaver_banner_title_font",	 label = _("Title font: %1"),	 default_name = B_SETT.title_fontFace },
+	{ key = "screensaver_banner_stats_font",	 label = _("Stats font: %1"),	 default_name = B_SETT.stats_fontFace },
+	{ key = "screensaver_banner_highlight_font", label = _("Highlight font: %1"), default_name = HL_SETT.highlight_fontFace },
+	{ key = "screensaver_banner_footer_font",	 label = _("Footer font: %1"),	 default_name = HL_SETT.hl_footer_fontFace },
+}
+
+local function getFontRoleBaseName(role)
+	local chosen = G_reader_settings:readSetting(role.key)
+	if chosen and chosen ~= "" then
+		return tostring(chosen):match("([^/\\]+)$") or tostring(chosen)
+	end
+	return role.default_name
+end
+
+local function buildStyleItems()
+	local items = {}
 	for _, item in ipairs(BANNER_STYLE_ITEMS) do
-		table.insert(style_items, {
+		table.insert(items, {
 				text = item.text,
 				help_text = item.help_text,
 				checked_func = function()
@@ -194,28 +246,87 @@ local function injectBannerStyleEntry(menu_items)
 				radio = true,
 		})
 	end
-	local banner_style_entry = {
-			text = _("Banner style"),
-			help_text = _("Look of the message banner drawn over the sleep screen wallpaper."),
-			sub_item_table = style_items,
-	}
-	-- place right after the "Sleep screen message" section when found
-	local at
-	for idx, entry in ipairs(sub_item_table) do
-		if entry.text == _("Sleep screen message") then
-			at = idx + 1
-			break
-		end
-	end
-	if at then
-		table.insert(sub_item_table, at, banner_style_entry)
-	else
-		table.insert(sub_item_table, banner_style_entry)
-	end
-	sub_item_table.banner_style_entry = true
+	return items
 end
 
-local function hookSleepScreenMenu(module_path)
+local function buildFontRoleItem(role)
+	return {
+			text_func = function()
+				return T(role.label, getFontRoleBaseName(role))
+			end,
+			sub_item_table_func = function()
+				local items = {
+						{
+								text = _("Default (from the config file)"),
+								checked_func = function()
+									return G_reader_settings:readSetting(role.key) == nil
+								end,
+								callback = function()
+									G_reader_settings:delSetting(role.key)
+								end,
+								radio = true,
+						},
+				}
+				if FontList and type(FontList.fontlist) == "table" then
+					for _, path in ipairs(FontList.fontlist) do
+						if type(path) == "string" then
+							local base = path:match("([^/\\]+)$") or path
+							table.insert(items, {
+									text = base,
+									checked_func = function()
+										return G_reader_settings:readSetting(role.key) == path
+									end,
+									callback = function()
+										G_reader_settings:saveSetting(role.key, path)
+									end,
+									font_func = function(size)
+										return Font:getFace(path, size)
+									end,
+									radio = true,
+							})
+						end
+					end
+				end
+				return items
+			end,
+	}
+end
+
+local function buildBannerMenu()
+	return {
+			text = _("Banner style"),
+			help_text = _("Look and fonts of the message banner drawn over the sleep screen wallpaper."),
+			sub_item_table = {
+					{
+							text = _("Message style"),
+							sub_item_table = buildStyleItems(),
+					},
+					{
+							text = _("Fonts"),
+							sub_item_table = {
+									buildFontRoleItem(BANNER_FONT_ROLES[1]),
+									buildFontRoleItem(BANNER_FONT_ROLES[2]),
+									buildFontRoleItem(BANNER_FONT_ROLES[3]),
+									buildFontRoleItem(BANNER_FONT_ROLES[4]),
+							},
+					},
+			},
+	}
+end
+
+local function orderHasBannerEntry(order)
+	if type(order) ~= "table" or type(order.setting) ~= "table" then
+		return true --malformed; don't touch it
+	end
+	for _, key in ipairs(order.setting) do
+		if key == BANNER_MENU_ID then
+			return true
+		end
+	end
+	return false
+end
+
+local function hookBannerMenu(module_path, order_path)
 	pcall(function()
 		local menu_module = require(module_path)
 		if not menu_module or not menu_module.setUpdateItemTable then
@@ -223,14 +334,23 @@ local function hookSleepScreenMenu(module_path)
 		end
 		local og_setUpdateItemTable = menu_module.setUpdateItemTable
 		menu_module.setUpdateItemTable = function(self, ...)
+			--register BEFORE the original merges menu_items with the
+			--order table, or MenuSorter will silently drop the entry
+			pcall(function()
+				local ok_order, order = pcall(require, order_path)
+				if ok_order and not orderHasBannerEntry(order) then
+					table.insert(order.setting, "----------------------------")
+					table.insert(order.setting, BANNER_MENU_ID)
+				end
+				self.menu_items[BANNER_MENU_ID] = buildBannerMenu()
+			end)
 			og_setUpdateItemTable(self, ...)
-			pcall(injectBannerStyleEntry, self.menu_items)
 		end
 	end)
 end
 
-hookSleepScreenMenu("apps/reader/modules/readermenu")
-hookSleepScreenMenu("apps/filemanager/filemanagermenu")
+hookBannerMenu("apps/reader/modules/readermenu", "ui/elements/reader_menu_order")
+hookBannerMenu("apps/filemanager/filemanagermenu", "ui/elements/filemanager_menu_order")
 
 local function buildTextField(
 								text, 
@@ -451,25 +571,18 @@ function UIManager:show(widget, ...)
 							(overflow_w + dimen_.line_clearance + dimen_.line_width) or
 							overflow_w
 	
-	--font roundup
+	--font roundup. menu picks win, then B_SETT names (resolved against
+	--every font KOReader can see), then the stock fallbacks.
 	local font_ = {
-		title_font = Font:getFace(
-						B_SETT.title_fontFace, 
-						B_SETT.title_fontSize) or 
-						Font:getFace("cfont", 30),
-		stats_font = Font:getFace(
-						B_SETT.stats_fontFace, 
-						B_SETT.stats_fontSize) or 
-						Font:getFace("cfont", 17),
-		footer_font = Font:getFace(
-						HL_SETT.hl_footer_fontFace, 
-						HL_SETT.hl_footer_fontSize) or 
-						Font:getFace("NotoSerif-Regular.ttf", 15),
-		highlight_font = Font:getFace(
-						HL_SETT.highlight_fontFace, 
-						HL_SETT.highlight_fontSize) or 
-						Font:getFace("NotoSerif-Italic.ttf", 16)					
-	}	
+			title_font = getFontFace("screensaver_banner_title_font",
+							B_SETT.title_fontFace, B_SETT.title_fontSize, "cfont", 30),
+			stats_font = getFontFace("screensaver_banner_stats_font",
+							B_SETT.stats_fontFace, B_SETT.stats_fontSize, "cfont", 17),
+			footer_font = getFontFace("screensaver_banner_footer_font",
+							HL_SETT.hl_footer_fontFace, HL_SETT.hl_footer_fontSize, "NotoSerif-Regular.ttf", 15),
+			highlight_font = getFontFace("screensaver_banner_highlight_font",
+							HL_SETT.highlight_fontFace, HL_SETT.highlight_fontSize, "NotoSerif-Italic.ttf", 16),
+	}
 	
 	--intercept the custom position container and child.
 	

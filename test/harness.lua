@@ -84,6 +84,7 @@ local store = {
 local G_reader_settings = {
   readSetting = function(_, k) return store[k] end,
   saveSetting = function(_, k, v) store[k] = v end,
+  delSetting = function(_, k) store[k] = nil end,
   isTrue = function(_, k) return store[k] == true end,
 }
 
@@ -105,6 +106,8 @@ local ScreenStub = {
 _G._ = function(s) return s end
 _G.G_reader_settings = G_reader_settings
 
+local face_calls = {}
+
 local bb = {
   COLOR_WHITE = "WHITE", COLOR_BLACK = "BLACK",
   COLOR_GRAY_4 = "GRAY4", COLOR_GRAY_9 = "GRAY9",
@@ -119,7 +122,19 @@ local stubs = {
   ["ui/widget/booklist"] = { getDocSettings = function() return sidecar end },
   ["datetime"] = { shortMonthTranslation = setmetatable({}, { __index = function(_, k) return k:lower() end }) },
   ["device"] = { screen = ScreenStub },
-  ["ui/font"] = { getFace = function() return { stubface = true } end },
+  ["ui/font"] = { getFace = function(self, font, size)
+    face_calls[#face_calls + 1] = { font = font, size = size }
+    return { stubface = true, name = font }
+  end },
+  ["fontlist"] = { fontlist = {
+    "/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Bold.ttf",
+    "/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Italic.ttf",
+    "/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Regular.ttf",
+    "/mnt/us/koreader/fonts/noto/NotoSans-Regular.ttf",
+  } },
+  ["ffi/util"] = { template = function(fmt, ...) local t = { ... } return (tostring(fmt):gsub("%%1", tostring(t[1] or ""))) end },
+  ["ui/elements/reader_menu_order"] = { setting = { "screen", "status_bar" } },
+  ["ui/elements/filemanager_menu_order"] = { setting = { "screensaver", "status_bar" } },
   ["ui/size"] = { padding = { large = 10 } },
   ["ui/geometry"] = { new = function(_, t) return t end },
   ["ui/uimanager"] = UIManager,
@@ -172,44 +187,50 @@ print("== T1: menu hooks installed ==")
 ok(ReaderMenuStub.setUpdateItemTable ~= og_readermenu_set, "readermenu.setUpdateItemTable wrapped")
 ok(FileManagerMenuStub.setUpdateItemTable ~= og_fm_set, "filemanagermenu.setUpdateItemTable wrapped")
 
-print("== T2: banner style entry injected into sleep screen menu ==")
-local function fakeMenuBuild(mod, menu_items)
-  mod.setUpdateItemTable({ menu_items = menu_items })
-end
-local function buildMenuItems()
-  return {
-    screensaver = {
-      text = "Sleep screen",
-      sub_item_table = {
-        { text = "Wallpaper", sub_item_table = {} },
-        { text = "Sleep screen message", sub_item_table = {} },
-      },
-    },
-  }
-end
-local mi = buildMenuItems()
-fakeMenuBuild(ReaderMenuStub, mi)
-local sub = mi.screensaver.sub_item_table
-ok(#sub == 3, "entry inserted (got " .. #sub .. " entries)")
-ok(sub[3] and sub[3].text == "Banner style", "entry placed after 'Sleep screen message'")
-ok(sub[3].sub_item_table and #sub[3].sub_item_table == 5, "5 style radio items")
-fakeMenuBuild(ReaderMenuStub, mi) -- idempotence on the same table
-ok(#sub == 3, "no duplicate on rebuild of same table")
-local mi2 = buildMenuItems()
-fakeMenuBuild(ReaderMenuStub, mi2)
-fakeMenuBuild(FileManagerMenuStub, mi2)
-ok(#mi2.screensaver.sub_item_table == 3, "reader+fm builds each get exactly one entry")
-ok(readermenu_calls == 3 and fm_calls == 1, "original setUpdateItemTable still called")
+print("== T2: banner menu registered via order tables ==")
+local reader_order = stubs["ui/elements/reader_menu_order"]
+local fm_order = stubs["ui/elements/filemanager_menu_order"]
+local mi = { menu_items = {} }
+ReaderMenuStub.setUpdateItemTable(mi)
+ok(mi.menu_items.banner_style ~= nil, "banner_style present in menu_items")
+local ord = reader_order.setting
+ok(ord[#ord] == "banner_style", "order.setting ends with banner_style")
+ok(ord[#ord - 1] == "----------------------------", "separator before banner_style")
+ReaderMenuStub.setUpdateItemTable(mi)
+local count = 0
+for _, k in ipairs(ord) do if k == "banner_style" then count = count + 1 end end
+ok(count == 1, "no duplicate order entries on rebuild")
+local mi2 = { menu_items = {} }
+FileManagerMenuStub.setUpdateItemTable(mi2)
+ok(mi2.menu_items.banner_style ~= nil, "FM build also registers banner_style")
+ok(fm_order.setting[#fm_order.setting] == "banner_style", "FM order patched too")
+
+local bs = mi.menu_items.banner_style
+ok(bs.text == "Banner style", "entry text")
+local sub = bs.sub_item_table
+ok(sub[1] and sub[1].text == "Message style" and #sub[1].sub_item_table == 5, "Message style: 5 radios")
+ok(sub[2] and sub[2].text == "Fonts" and #sub[2].sub_item_table == 4, "Fonts: 4 roles")
 
 local radios = {}
-for _, it in ipairs(sub[3].sub_item_table) do radios[it.text] = it end
-ok(radios["Floating card"].checked_func() == true, "default style is floating_card (B_SETT.style)")
+for _, it in ipairs(sub[1].sub_item_table) do radios[it.text] = it end
+ok(radios["Floating card"].checked_func() == true, "default style floating_card (B_SETT.style)")
 radios["Pill"].callback()
-ok(store.screensaver_banner_style == "pill", "pill callback persists choice")
-ok(radios["Pill"].checked_func() == true and not radios["Floating card"].checked_func(), "checked_func follows persisted choice")
-store.screensaver_banner_style = "bogus"
-ok(radios["Floating card"].checked_func() == true, "invalid stored style falls back")
+ok(store.screensaver_banner_style == "pill", "style callback persists")
+ok(radios["Pill"].checked_func() == true, "checked_func follows persisted choice")
 store.screensaver_banner_style = nil
+
+local role = sub[2].sub_item_table[1] -- Title font
+local list = role.sub_item_table_func()
+ok(#list == 5, "font list = Default + 4 discovered fonts")
+ok(list[1].checked_func() == true, "Default checked when nothing persisted")
+local libron_path = "/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Bold.ttf"
+ok(list[2].text == "Libron_R-Bold.ttf" and list[2].checked_func() == false, "unpicked font unchecked")
+list[2].callback()
+ok(store.screensaver_banner_title_font == libron_path, "font pick persists full path")
+ok(list[2].checked_func() == true and not list[1].checked_func(), "checked state follows pick")
+ok(tostring(role.text_func()):find("Libron_R%-Bold") ~= nil, "role label shows picked font")
+list[1].callback()
+ok(store.screensaver_banner_title_font == nil, "Default entry clears the pick")
 
 print("== T3: show() guards pass through untouched widgets ==")
 UIManager.passthrough = 0
@@ -327,6 +348,30 @@ do
   w, cp = makeWidget()
   UIManager:show(w)
   ok(#cp.widget[2][2][2][1] == 2, "empty-text highlight skipped")
+end
+
+print("== T6: font resolution at draw time ==")
+do
+  store.screensaver_banner_style = "floating_card"
+  sidecar._annotations = {}
+  local w = makeWidget()
+  UIManager:show(w)
+  local function used(font)
+    for i = #face_calls, 1, -1 do
+      if face_calls[i].font == font then return true end
+    end
+    return false
+  end
+  ok(used("/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Bold.ttf"), "title resolved to discovered Libron_R-Bold.ttf path")
+  ok(used("cfont"), "stats falls back to cfont alias")
+  ok(used("/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Regular.ttf"), "footer resolved to discovered Libron_R-Regular.ttf path")
+  ok(used("/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Italic.ttf"), "highlight resolved to discovered Libron_R-Italic.ttf path")
+  store.screensaver_banner_title_font = "/mnt/us/koreader/fonts/noto/NotoSans-Regular.ttf"
+  face_calls = {}
+  w = makeWidget()
+  UIManager:show(w)
+  ok(used("/mnt/us/koreader/fonts/noto/NotoSans-Regular.ttf"), "persisted font pick wins over B_SETT default")
+  store.screensaver_banner_title_font = nil
 end
 
 print(string.format("\n%d passed, %d failed", PASS, FAIL))

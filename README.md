@@ -5,8 +5,8 @@ A [KOReader](https://koreader.rocks) user patch that redesigns the built-in "ban
 This is a *prettified* fork of an existing community patch. It keeps the original banner behaviour and adds:
 
 - A **floating-card visual identity**: rounded corners plus a hard offset drop shadow, so the card reads as a tag sitting above the cover rather than a flat box.
-- **Per-element font control**, wired for the [ebook-fonts](https://github.com/nicoverbruggen/ebook-fonts) collection out of the box (serif title and quote, a legible sans for the page counter).
-- **Selectable banner styles**: the floating card, a pill, a full-width banner, an outlined ghost card, and a bracketed typographic look — pick one in the Sleep Screen settings, no restart needed.
+- **Menu-selectable fonts**: pick the title, stats, highlight and footer fonts from anything KOReader can see, right in the settings (defaults wired for the [ebook-fonts](https://github.com/nicoverbruggen/ebook-fonts) serif collection).
+- **Selectable banner styles**: the floating card, a pill, a full-width banner, an outlined ghost card, and a bracketed typographic look — pick one under Settings → Banner style, no restart needed.
 
 See [Credits](#credits) for the original authors.
 
@@ -25,7 +25,7 @@ Everything sits inside an opaque, rounded, shadowed card. The card is drawn once
 - KOReader (reasonably recent; the patch carries a compatibility shim for versions older than `v2025.04-115`).
 - A device where you can drop files into `koreader/patches/` (Kobo, Kindle with a KOReader install, PocketBook, reMarkable, Android, etc.).
 - The screensaver configured to use the banner message over a cover image (see below).
-- The fonts named in the default config. As shipped it expects **Libron** from the [ebook-fonts](https://github.com/nicoverbruggen/ebook-fonts) collection (see [Fonts](#fonts)). Any font already on your device works too; you just change the config.
+- Fonts for the defaults. As shipped it expects **Libron** from the [ebook-fonts](https://github.com/nicoverbruggen/ebook-fonts) collection (see [Fonts](#fonts)); anything missing just falls back to your KOReader UI font, and every font is switchable in the menu anyway.
 
 ## Installation
 
@@ -60,7 +60,7 @@ All options live in the two tables at the top of the `.lua` file. Edit, save, re
 | --- | --- | --- |
 | `style` | `"floating_card"` | Default banner style (see [Banner styles](#banner-styles)). Used until you pick a style in the Sleep Screen settings menu, which then takes precedence. |
 | `title_text` | `"%T"` | Big title line. Accepts the same tokens as the KOReader sleep message (`%T`, `%A`, `%c`, `%t`, ...). |
-| `title_fontFace` | `"Libron-Bold.ttf"` | Font for the title. A bare filename, or a KOReader alias like `cfont`. |
+| `title_fontFace` | `"Libron_R-Bold.ttf"` | Font for the title. A bare filename (resolved against every font KOReader can see), or a KOReader alias like `cfont`. Menu pick wins over this. |
 | `title_fontSize` | `30` | |
 | `stats_fontFace` | `"cfont"` | Font for the stats block. `cfont` follows KOReader's UI font. |
 | `stats_fontSize` | `17` | |
@@ -79,7 +79,11 @@ All options live in the two tables at the top of the `.lua` file. Edit, save, re
 
 ### Banner styles
 
-Pick a style under **Settings → Screen → Sleep screen → Banner style** (it shows up in the file browser's settings too). The choice is saved with KOReader's settings and applies from the next sleep — no restart needed. If you have never picked one there, the `style` value in `B_SETT` is used instead.
+Open **Settings → Banner style** — a top-level entry at the bottom of the Settings tab (it shows up in the file browser's settings too, next to the stock "Sleep screen" entry). Inside you get **Message style** (the five looks below) and **Fonts** (see [Banner fonts](#banner-fonts)). The choice is saved with KOReader's settings and applies from the next sleep — no restart needed. If you have never picked one there, the `style` value in `B_SETT` is used instead.
+
+### Banner fonts
+
+Under **Banner style → Fonts** you can pick the font for each of the four text roles — title, stats, highlight and footer — from every font file KOReader can see (each entry renders in its own font). The pick is saved with KOReader's settings; choose "Default (from the config file)" to go back to the `B_SETT` values. Resolution is by font *file* name, in any subdirectory of `koreader/fonts/`, so collection-specific layouts (e.g. `relaxed-core-fonts/Libron_R-Bold.ttf`) work as-is.
 
 | Style | Look |
 | --- | --- |
@@ -94,13 +98,13 @@ Pick a style under **Settings → Screen → Sleep screen → Banner style** (it
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `showRandomHighlight` | `true` | Pull a random highlight from the last book. |
-| `highlight_fontFace` | `"Libron-Italic.ttf"` | Font for the quote. |
+| `highlight_fontFace` | `"Libron_R-Italic.ttf"` | Font for the quote. |
 | `highlight_fontSize` | `16` | |
 | `justify` | `true` | Justify the quote text. |
 | `add_quotations` | `true` | Wrap the quote in typographic quotes if it lacks them. |
 | `show_accent_line` | `true` | Draw a vertical accent rule beside the quote. |
 | `showHighlightFooter` | `true` | Show an attribution line under the quote. |
-| `hl_footer_fontFace` | `"Libron-Regular.ttf"` | Font for the footer. |
+| `hl_footer_fontFace` | `"Libron_R-Regular.ttf"` | Font for the footer. |
 | `hl_footer_fontSize` | `15` | |
 | `hl_footer_text` | `"saved on %DT at %HM"` | Footer template (see tokens below). |
 | `allowed_hl_styles` | lighten, underscore | Which highlight drawer styles are eligible to be shown. |
@@ -111,19 +115,21 @@ Pick a style under **Settings → Screen → Sleep screen → Banner style** (it
 
 ## Fonts
 
-**This fork's default config depends on the [ebook-fonts](https://github.com/nicoverbruggen/ebook-fonts) collection.** It uses the serif **Libron** for the title, quote, and footer, and leaves the page counter on `cfont` so it inherits your KOReader UI font. Specifically it expects these three files to be somewhere KOReader scans for fonts (for example `koreader/fonts/`):
+The defaults expect the serif **Libron** from the [ebook-fonts](https://github.com/nicoverbruggen/ebook-fonts) collection (the page counter stays on `cfont` so it inherits your KOReader UI font). Specifically the defaults are:
 
-- `Libron-Bold.ttf` (title)
-- `Libron-Italic.ttf` (highlight quote)
-- `Libron-Regular.ttf` (highlight footer)
+- `Libron_R-Bold.ttf` (title)
+- `Libron_R-Italic.ttf` (highlight quote)
+- `Libron_R-Regular.ttf` (highlight footer)
 
-Grab them from the ebook-fonts release (they live under `fonts/core/`). If you would rather not install them, change the `title_fontFace`, `highlight_fontFace`, and `hl_footer_fontFace` values to fonts you already have. Any filename in a KOReader font path works, as does an alias like `cfont` or `NotoSerif-Regular.ttf`. Nothing else in the patch depends on ebook-fonts.
+Note the `_R` infix — that's how the current ebook-fonts collection names these files (on the device they land under `koreader/fonts/relaxed-core-fonts/`). Older releases used `Libron-Bold.ttf`-style names; if yours are named that way, rename them or just pick them in the menu.
+
+You don't have to install anything, though: every font KOReader can see is selectable under **Banner style → Fonts**, and anything unresolvable falls back to your KOReader UI font. Aliases like `cfont` still work in `B_SETT` too.
 
 ## How it works
 
 The patch wraps `UIManager:show`. When the widget being shown is the screensaver, and the current settings match the banner-over-cover case, it walks into the screensaver's message container, rebuilds the message as a framed card (title, stats, and optional highlight widgets), composites a drop shadow behind it with an `OverlapGroup`, and hands the result back to the original `show`. In every other case it calls straight through, so nothing else is affected.
 
-It also hooks the settings menu. KOReader rebuilds the Sleep screen submenu every time the menu opens, so the patch wraps `setUpdateItemTable` on the reader and file browser menu modules and slips a **Banner style** radio picker into the fresh submenu each time. That picker needs a reasonably recent KOReader (one with the current Sleep screen menu); on older installs the patch keeps working, just with the file-configured `style`.
+It also hooks the settings menu. KOReader assembles its menus by merging `menu_items` with an order table (MenuSorter), and any item missing from the order is silently dropped — so the patch registers a top-level **Banner style** key and inserts it into the order table *before* the original builder runs, following the same approach as the community ui-font user patch. This needs a reasonably recent KOReader; on older installs the patch keeps working, just with the file-configured `style`.
 
 ## Credits
 
