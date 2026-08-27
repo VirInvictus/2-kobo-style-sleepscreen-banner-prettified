@@ -6,7 +6,7 @@ This is a *prettified* fork of an existing community patch. It keeps the origina
 
 - A **floating-card visual identity**: rounded corners plus a hard offset drop shadow, so the card reads as a tag sitting above the cover rather than a flat box.
 - **Menu-selectable fonts**: pick the title, stats, highlight and footer fonts from anything KOReader can see, right in the settings (defaults wired for the [ebook-fonts](https://github.com/nicoverbruggen/ebook-fonts) serif collection).
-- **Selectable banner styles**: the floating card, a pill, a full-width banner, an outlined ghost card, and a bracketed typographic look — pick one under Settings → Banner style, no restart needed.
+- **Selectable banner styles**: the floating card, a pill, a full-width banner, an outlined ghost card, and a flat no-border box — pick one under Settings → Banner style, no restart needed.
 
 See [Credits](#credits) for the original authors.
 
@@ -88,10 +88,10 @@ Under **Banner style → Fonts** you can pick the font for each of the four text
 | Style | Look |
 | --- | --- |
 | `floating_card` | The classic prettified look: rounded corners plus the hard offset drop shadow. |
-| `pill` | A fully rounded lozenge — the radius is computed from the card's height, so it stays a perfect pill however tall the text is. Keeps the shadow. |
+| `pill` | A fully rounded lozenge — the radius follows the card height and the sides get extra padding (up to the cap radius, as far as the screen allows) so the text always sits on the straight section, fully backed. Keeps the shadow. |
 | `full_width` | The classic banner: spans the whole screen width flush against the edges, square corners, no shadow. `max_width_hl_off` / `max_width_hl_on` don't apply in this style; the text simply uses all the width the card has. |
-| `outlined` | A ghost card: your usual background and corner radius, but a thick 3 px border and no drop shadow. |
-| `bracketed` | Pure typography: no card at all, just two horizontal rules above and below the text (2 px rules, 8 px gap, inked like the text). The vertical accent line beside the highlight still works. |
+| `outlined` | A ghost card: your usual background and corner radius, but an extra-thick 5 px border and no drop shadow. |
+| `bracketed` | Shown in the menu as **Flat box**: a plain solid backing behind the text — no border, no rounded corners, no shadow. Just enough background to keep everything readable. (v2.1.0's rules-on-the-cover look was retired in v2.1.2.) |
 
 ### Highlights (`HL_SETT`)
 

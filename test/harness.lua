@@ -47,10 +47,14 @@ local HorizontalGroup = mkclass("horizontalgroup", function(self) return sumChil
 local VerticalSpan    = mkclass("verticalspan", function(self) return { w = 0, h = self.width or 0 } end)
 local HorizontalSpan  = mkclass("horizontalspan", function(self) return { w = self.width or 0, h = 0 } end)
 local FrameContainer  = mkclass("framecontainer", function(self)
-  -- match the real widget: child is the positional self[1]
+  -- match the real widget: positional self[1] child, per-side padding
   local cs = self[1] and self[1]:getSize() or { w = 0, h = 0 }
-  local pad = (self.padding or 0) + (self.bordersize or 0)
-  return { w = cs.w + 2 * pad, h = cs.h + 2 * pad }
+  local pl = self.padding_left or self.padding or 0
+  local pr = self.padding_right or self.padding or 0
+  local pt = self.padding_top or self.padding or 0
+  local pb = self.padding_bottom or self.padding or 0
+  local b = self.bordersize or 0
+  return { w = cs.w + pl + pr + 2 * b, h = cs.h + pt + pb + 2 * b }
 end)
 local LeftContainer   = mkclass("leftcontainer", function(self) return { w = self.dimen.w, h = self.dimen.h } end)
 local LineWidget      = mkclass("linewidget", function(self) return { w = self.dimen.w, h = self.dimen.h } end)
@@ -295,10 +299,12 @@ do
   local layer = getCardLayer(cuspos)
   ok(layer._kind == "overlapgroup", "pill keeps its shadow")
   local card = layer[2]
-  local expected = math.floor(card:getSize().h / 2)
-  ok(card.radius == expected and expected > 0, "pill radius = height/2 (" .. tostring(card.radius) .. ")")
+  local half_h = math.floor(card:getSize().h / 2)
+  ok(card.radius == half_h and half_h > 0, "pill radius = height/2 (" .. tostring(card.radius) .. ")")
+  ok(card.padding_left == half_h and card.padding_right == half_h, "caps get padding up to the cap radius")
+  ok(card:getSize().w >= card[1]:getSize().w + 2 * half_h, "card fully covers the text including the caps")
   ok(layer[1][2][2]._kind == "framecontainer", "shadow box is framed")
-  ok(layer[1][2][2].radius == expected, "shadow follows the pill radius")
+  ok(layer[1][2][2].radius == half_h, "shadow follows the pill radius")
 end
 
 -- full_width
@@ -320,7 +326,7 @@ do
   local cuspos = runStyle("outlined", true)
   local layer = getCardLayer(cuspos)
   ok(layer._kind == "framecontainer", "no shadow layer for outlined")
-  ok(layer.bordersize == 3, "thick 3px border")
+  ok(layer.bordersize == 5, "extra-thick 5px border")
   ok(layer.radius == 8, "keeps rounded corners")
 end
 
@@ -329,12 +335,9 @@ do
   print("  -- bracketed")
   local cuspos = runStyle("bracketed", true)
   local layer = getCardLayer(cuspos)
-  ok(layer._kind == "verticalgroup", "bracketed replaces the frame with a vertical group")
-  ok(#layer == 5, "rule, gap, content, gap, rule")
-  ok(layer[1]._kind == "linewidget" and layer[5]._kind == "linewidget", "top+bottom rules")
-  ok(layer[3]._kind == "verticalgroup", "content between the rules")
-  ok(layer[1]:getSize().w == layer[3]:getSize().w, "rules span the content width")
-  ok(layer[1]:getSize().h == 2 and layer[2].width == 8, "2px rules with 8px gap")
+  ok(layer._kind == "framecontainer", "flat box is a framed card")
+  ok(layer.bordersize == 0 and layer.radius == 0, "no border, square corners")
+  ok(layer:getSize().w >= layer[1]:getSize().w, "background covers the full text")
 end
 
 print("== T5: highlight handling (phase 2) ==")

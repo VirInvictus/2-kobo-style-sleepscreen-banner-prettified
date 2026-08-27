@@ -2,6 +2,10 @@
 --redesigns the inbuilt 'banner' type sleep screen message to
 --make it look like the kobo lockscreen tag.
 
+--[ v2.1.2 ]
+--pill: side padding grows to the cap radius so text is fully covered
+--bracketed redesigned as "Flat box": solid backing, no border/corners
+--outlined: border thickened to 5px
 --[ v2.1.1 ]
 --menu registration fixed: Banner style now lives at the bottom of the
 --Settings tab (order-table aware, same approach as the ui-font patch)
@@ -123,6 +127,7 @@ local STYLE_DEFS = {
 			margin = B_SETT.margin or 10,
 			border_size = B_SETT.border_size or 1,
 			radius_from_height = true,	-- radius = card height / 2
+			cap_padding = true,		-- widen side padding to the cap radius
 	},
 	full_width = {			-- classic edge-to-edge banner
 			frame = true,
@@ -138,25 +143,25 @@ local STYLE_DEFS = {
 			shadow = false,
 			padding = B_SETT.padding or 15,
 			margin = B_SETT.margin or 10,
-			border_size = 3,			-- thick border
+			border_size = 5,			-- extra-thick border
 			radius = B_SETT.corner_radius or 0,
 	},
-	bracketed = {			-- typographic rules, no card at all
-			frame = false,
+	bracketed = {			-- flat box: bare background, zero chrome
+			frame = true,
 			shadow = false,
-			padding = 0,
+			padding = B_SETT.padding or 15,
 			margin = B_SETT.margin or 10,
-			border_size = 0,
-			radius = 0,
+			border_size = 0,			-- no border at all
+			radius = 0,					-- square corners
 	},
 }
 
 local BANNER_STYLE_ITEMS = {
 	{ id = "floating_card",	text = _("Floating card"),	help_text = _("Rounded card with a hard offset drop shadow (default).") },
-	{ id = "pill",			text = _("Pill"),			help_text = _("Fully rounded lozenge floating over the cover.") },
+	{ id = "pill",			text = _("Pill"),			help_text = _("Fully rounded lozenge — the ends get extra padding so the text stays well inside the caps.") },
 	{ id = "full_width",	text = _("Full width"),		help_text = _("Classic banner spanning the whole screen, flush against the edges, no shadow.") },
-	{ id = "outlined",		text = _("Outlined"),		help_text = _("Minimal ghost card: thick border, no drop shadow.") },
-	{ id = "bracketed",		text = _("Bracketed"),		help_text = _("Typographic rules above and below the text instead of a card.") },
+	{ id = "outlined",		text = _("Outlined"),		help_text = _("Minimal ghost card: extra-thick 5 px border, no drop shadow.") },
+	{ id = "bracketed",		text = _("Flat box"),		help_text = _("Solid backing behind the text: no border, corners or shadow.") },
 }
 
 local function getBannerStyle()
@@ -549,24 +554,14 @@ function UIManager:show(widget, ...)
 			shadow_offset = B_SETT.shadow_offset and
 							Screen:scaleBySize(B_SETT.shadow_offset) or
 							Screen:scaleBySize(6),
-			rule_width = Screen:scaleBySize(2),	--bracketed style rules
-			rule_gap = Screen:scaleBySize(8),	--bracketed style text gap
 	}
 	
-	--vertical/horizontal chrome the style wraps around the text, used
-	--to keep the card within the configured max width and height
-	local chrome_v, chrome_h
-	if style.frame then
-		chrome_v = dimen_.padding + dimen_.margin + dimen_.border_size
-		chrome_h = chrome_v
-	else
-		chrome_v = dimen_.margin + dimen_.rule_gap + dimen_.rule_width
-		chrome_h = dimen_.margin
-	end
-	
-	local overflow_h = chrome_v * 2 +
+	--card chrome (padding + margin + border, on each side), used to
+	--keep the card within the configured max width and height
+	local chrome = dimen_.padding + dimen_.margin + dimen_.border_size
+	local overflow_h = chrome * 2 +
 							dimen_.hl_wgt_clearance
-	local overflow_w = chrome_h * 2
+	local overflow_w = chrome * 2
 	local overflow_w_hl = HL_SETT.show_accent_line and
 							(overflow_w + dimen_.line_clearance + dimen_.line_width) or
 							overflow_w
@@ -806,67 +801,48 @@ function UIManager:show(widget, ...)
 		table.insert(content_widget, highlight_widget)
 	end
 	
-	-- the card itself. the style decides whether we draw a framed card
-	-- (floating card, pill, full width, outlined) or a bare typographic
-	-- bracket. margin stays out in the leading spans below so the drop
-	-- shadow has room to peek past the card's bottom-right edge.
-	local card
-	if style.frame then
-		local card_inner = content_widget
-		if style.span_screen then
-			-- stretch the content group to the full screen width so the
-			-- FrameContainer ends up spanning screen_w, edge to edge.
-			local content_size = content_widget:getSize()
-			card_inner = LeftContainer:new{
-					dimen = Geom:new{
-						w = screen_w - 2 * (dimen_.padding + dimen_.border_size),
-						h = content_size.h,
-					},
-					content_widget,
-			}
-		end
-		card = FrameContainer:new{
-			background = B_SETT.background == 0 and Bb.COLOR_WHITE or
-						 Bb.COLOR_BLACK,
-			color = B_SETT.border_color == 0 and Bb.COLOR_WHITE or
-					Bb.COLOR_BLACK,
-			radius = dimen_.corner_radius,
-			margin = 0,
-			bordersize = dimen_.border_size,
-			padding = dimen_.padding,
-			card_inner,	--positional child: FrameContainer reads self[1]
-		}
-		if style.radius_from_height then
-			-- pill: round the card into a lozenge once its height is known
-			card.radius = math.floor(card:getSize().h / 2)
-		end
-	else
-		-- bracketed: sandwich the content between two horizontal rules
-		local ink = B_SETT.background == 1 and Bb.COLOR_WHITE or Bb.COLOR_BLACK
-		local content_w = content_widget:getSize().w
-		if content_w < 1 then content_w = 1 end
-		card = VerticalGroup:new{
-			align = "left",
-			LineWidget:new{
-							background = ink,
-							dimen = Geom:new{
-								w = content_w,
-								h = dimen_.rule_width,
-							},
-			},
-			VerticalSpan:new{width = dimen_.rule_gap},
-			content_widget,
-			VerticalSpan:new{width = dimen_.rule_gap},
-			LineWidget:new{
-							background = ink,
-							dimen = Geom:new{
-								w = content_w,
-								h = dimen_.rule_width,
-							},
-			},
+	-- the card itself: every style draws a FrameContainer (border,
+	-- corners and shadow vary by style). margin stays out in the
+	-- leading spans below so the drop shadow has room to peek past
+	-- the card's bottom-right edge.
+	local card_inner = content_widget
+	if style.span_screen then
+		-- stretch the content group to the full screen width so the
+		-- FrameContainer ends up spanning screen_w, edge to edge.
+		local content_size = content_widget:getSize()
+		card_inner = LeftContainer:new{
+				dimen = Geom:new{
+					w = screen_w - 2 * (dimen_.padding + dimen_.border_size),
+					h = content_size.h,
+				},
+				content_widget,
 		}
 	end
-
+	local card = FrameContainer:new{
+		background = B_SETT.background == 0 and Bb.COLOR_WHITE or
+					 Bb.COLOR_BLACK,
+		color = B_SETT.border_color == 0 and Bb.COLOR_WHITE or
+				Bb.COLOR_BLACK,
+		radius = dimen_.corner_radius,
+		margin = 0,
+		bordersize = dimen_.border_size,
+		padding = dimen_.padding,
+		card_inner,	--positional child: FrameContainer reads self[1]
+	}
+	if style.radius_from_height then
+		-- pill: round the card into a lozenge once its height is known,
+		-- then widen the side padding up to the cap radius (as far as the
+		-- screen allows) so the text sits on the straight section of the
+		-- pill instead of spilling onto the curves.
+		local half_h = math.floor(card:getSize().h / 2)
+		local content_w = card[1]:getSize().w
+		local max_pad_x = math.floor(
+			(screen_w - 2 * dimen_.margin - content_w - 2 * dimen_.border_size) / 2)
+		local pad_x = math.max(dimen_.padding, math.min(half_h, max_pad_x))
+		card.padding_left = pad_x
+		card.padding_right = pad_x
+		card.radius = half_h
+	end
 	-- composite a hard offset drop shadow behind the card so it reads
 	-- as a card floating above the cover.
 	local card_layer = card

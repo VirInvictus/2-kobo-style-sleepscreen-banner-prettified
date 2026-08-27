@@ -1,6 +1,11 @@
 # Patch Notes
 
-## v2.1.1
+## v2.1.2
+*   **Pill**: the ends now get extra side padding — up to the cap radius, as far as the screen allows — so the text sits on the straight section of the lozenge and is always fully backed, never spilling onto the curves.
+*   **Bracketed redesigned into "Flat box"**: the rules-on-the-cover look is gone. It's now a plain solid backing behind the text — no border, no rounded corners, no shadow — so author names and quotes stay readable (settings id unchanged).
+*   **Outlined**: border thickened 3 px → 5 px.
+
+
 *   **Fixed: missing "Banner style" menu entry.** KOReader's MenuSorter drops any top-level item that isn't listed in its order tables; the entry is now registered there before the menu is assembled, the same way the ui-font patch does it.
 *   **Banner fonts are now menu-selectable** under Banner style → Fonts (title / stats / highlight / footer), picked from every font file KOReader can see, rendered in their own font in the picker, with a per-role "back to config default" entry. No more hard-coded font filenames.
 *   **Font finder fixed**: resolution now matches by file name against everything KOReader discovered (any subdirectory of `koreader/fonts/`), so collection layouts like `relaxed-core-fonts/Libron_R-Bold.ttf` resolve properly; unresolvable fonts fall back to the KOReader UI font instead of erroring.
