@@ -1,8 +1,0 @@
-# Project rules — full notes in CLAUDE.md
-
-- FrameContainer's child is the positional `self[1]`; never pass it as a named field.
-- Menu items must be registered in the order tables BEFORE MenuSorter merges, or they are silently dropped.
-- Never monkey-patch KOReader plugin modules (they are dofile'd); only require-loaded core modules.
-- Deploy over the SSH exec channel (KOReader's SSH server has no SFTP); verify md5 on both sides.
-- Run `lua test/harness.lua` AND `luajit test/harness.lua` before deploying; stubs must mirror real widget semantics.
-- Keep README.md, patchnotes.md, spec.md, and the patch header version in sync with every change.
