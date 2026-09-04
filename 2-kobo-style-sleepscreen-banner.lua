@@ -2,6 +2,10 @@
 --redesigns the inbuilt 'banner' type sleep screen message to
 --make it look like the kobo lockscreen tag.
 
+--[ v2.1.3 ]
+--fix: a '%' in a substituted footer value (chapter/author/title tokens)
+--crashed the substitution; values are now inserted literally
+
 --[ v2.1.2 ]
 --pill: side padding grows to the cap radius so text is fully covered
 --bracketed redesigned as "Flat box": solid backing, no border/corners
@@ -471,8 +475,10 @@ local function parseFooterText(text, index)
 		["%%T"] = bk_title
 	}	
 	for pattern, replacement in pairs(sub_table) do
-		if replacement then 
-			text = string.gsub(text, pattern, replacement)
+		if replacement then
+			--function replacement: values go in literally, a '%' in the
+			--title/author/chapter must not be read as a gsub capture
+			text = string.gsub(text, pattern, function() return replacement end)
 		end
 	end
 	return text	

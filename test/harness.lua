@@ -377,5 +377,21 @@ do
   store.screensaver_banner_title_font = nil
 end
 
+print("== T7: '%' sneaking into a substituted value must not crash the footer ==")
+do
+  store.screensaver_banner_style = "floating_card"
+  sidecar._annotations = {
+    { text = "certain to 100% precision", drawer = "underscore", datetime = "2025-08-01 12:30%x", pageno = 42, chapter = "Ch. 4: 50% off" },
+  }
+  sidecar._props = { title = "The 100% Solution", authors = "A. Writer" }
+  local w, cp = makeWidget()
+  local ran, err = pcall(UIManager.show, UIManager, w)
+  ok(ran, "show() survives % in substituted values (" .. tostring(err) .. ")")
+  if ran then
+    ok(#cp.widget[2][2][2][1] == 4, "highlight + footer still assembled")
+  end
+  sidecar._props = { title = "Test Book", authors = "An Author" }
+end
+
 print(string.format("\n%d passed, %d failed", PASS, FAIL))
 os.exit(FAIL == 0 and 0 or 1)

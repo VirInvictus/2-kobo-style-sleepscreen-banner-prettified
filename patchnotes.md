@@ -1,5 +1,8 @@
 # Patch Notes
 
+## v2.1.3
+*   **Fixed: crash when a substituted value contains a `%`.** If the footer template pulls in the chapter, author or title tokens (`%C`, `%A`, `%T`) and that metadata holds a literal percent sign ("The 100% Solution"), the footer's text substitution errored out and took the sleep-screen draw down with it. Substitution values are now inserted literally instead of being read as gsub replacement strings.
+
 ## v2.1.2
 *   **Pill**: the ends now get extra side padding — up to the cap radius, as far as the screen allows — so the text sits on the straight section of the lozenge and is always fully backed, never spilling onto the curves.
 *   **Bracketed redesigned into "Flat box"**: the rules-on-the-cover look is gone. It's now a plain solid backing behind the text — no border, no rounded corners, no shadow — so author names and quotes stay readable (settings id unchanged).
