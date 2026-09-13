@@ -11,7 +11,7 @@ This roadmap tracks the development phases for turning the static user patch int
 - [x] **Implement 'Floating Card' Style:** Default. Behaviour unchanged from v2.0.3.
 - [x] **Implement 'Pill / Badge' Style:** Radius computed from the assembled card's height (`radius = height / 2`); the drop shadow follows the same radius.
 - [x] **Implement 'Full-Width' Style:** Card stretched to `screen_w` via a `LeftContainer`, zero margins, square corners, no shadow; text uses all the width the chrome leaves over (`max_width_hl_*` percentages don't apply in this style).
-- [x] **Implement 'Outlined' Style:** User background and corner radius kept, thick 3 px border, drop shadow removed.
+- [x] **Implement 'Outlined' Style:** User background and corner radius kept, thick 5 px border, drop shadow removed. *(Corrected 2026-09-13: the box said 3 px; v2.1.0 thickened the border to 5 px and the code ships 5.)*
 - [x] **Implement 'Bracketed' Style:** shipped in v2.1.0 as typographic rules above/below the text; redesigned in v2.1.2 as **"Flat box"** (menu label) — a plain solid backing behind the text, no border, corners or shadow, which reads far better over real covers. Settings id unchanged.
 
 ## Phase 2: Robust Highlight Handling ✅ — shipped in v2.1.0
