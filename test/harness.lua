@@ -112,6 +112,16 @@ _G.G_reader_settings = G_reader_settings
 
 local face_calls = {}
 
+-- hoisted above the stubs table so the getFace closure can see it (a
+-- local is not in scope inside its own table constructor); deliberately
+-- NOT alphabetical, so the picker's sort is actually exercised
+local stub_fontlist = {
+  "/mnt/us/koreader/fonts/noto/NotoSans-Regular.ttf",
+  "/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Regular.ttf",
+  "/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Bold.ttf",
+  "/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Italic.ttf",
+}
+
 local bb = {
   COLOR_WHITE = "WHITE", COLOR_BLACK = "BLACK",
   COLOR_GRAY_4 = "GRAY4", COLOR_GRAY_9 = "GRAY9",
@@ -123,19 +133,27 @@ end })
 local stubs = {
   ["ffi/blitbuffer"] = bb,
   ["apps/filemanager/filemanagerbookinfo"] = { expandString = function() return "Test Title" end },
-  ["ui/widget/booklist"] = { getDocSettings = function() return sidecar end },
+  ["ui/widget/booklist"] = { getDocSettings = function(file)
+    -- mirror the real DocSettings:open: a nil path is a hard error on
+    -- device (it crashes in getSidecarFilename). dot-called: (file).
+    assert(file ~= nil, "DocSettings:open(nil) crashes on device")
+    return sidecar
+  end },
   ["datetime"] = { shortMonthTranslation = setmetatable({}, { __index = function(_, k) return k:lower() end }) },
   ["device"] = { screen = ScreenStub },
   ["ui/font"] = { getFace = function(self, font, size)
     face_calls[#face_calls + 1] = { font = font, size = size }
+    -- mirror the real face loader: aliases and discovered files load,
+    -- a full path that is not on disk (stale menu pick) does not
+    if type(font) == "string" and font:find("/", 1, true) then
+      for _, p in ipairs(stub_fontlist) do
+        if p == font then return { stubface = true, name = font } end
+      end
+      return nil
+    end
     return { stubface = true, name = font }
   end },
-  ["fontlist"] = { fontlist = {
-    "/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Bold.ttf",
-    "/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Italic.ttf",
-    "/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Regular.ttf",
-    "/mnt/us/koreader/fonts/noto/NotoSans-Regular.ttf",
-  } },
+  ["fontlist"] = { fontlist = stub_fontlist },
   ["ffi/util"] = { template = function(fmt, ...) local t = { ... } return (tostring(fmt):gsub("%%1", tostring(t[1] or ""))) end },
   ["ui/elements/reader_menu_order"] = { setting = { "screen", "status_bar" } },
   ["ui/elements/filemanager_menu_order"] = { setting = { "screensaver", "status_bar" } },
@@ -212,16 +230,20 @@ ok(fm_order.setting[#fm_order.setting] == "banner_style", "FM order patched too"
 local bs = mi.menu_items.banner_style
 ok(bs.text == "Banner style", "entry text")
 local sub = bs.sub_item_table
-ok(sub[1] and sub[1].text == "Message style" and #sub[1].sub_item_table == 5, "Message style: 5 radios")
+ok(sub[1] and sub[1].text == "Message style" and #sub[1].sub_item_table == 6, "Message style: Default reset + 5 looks")
 ok(sub[2] and sub[2].text == "Fonts" and #sub[2].sub_item_table == 4, "Fonts: 4 roles")
 
 local radios = {}
 for _, it in ipairs(sub[1].sub_item_table) do radios[it.text] = it end
+ok(radios["Default (from the config file)"] ~= nil, "Message style has the Default reset entry")
+ok(radios["Default (from the config file)"].checked_func() == true, "reset checked when nothing persisted")
 ok(radios["Floating card"].checked_func() == true, "default style floating_card (B_SETT.style)")
 radios["Pill"].callback()
 ok(store.screensaver_banner_style == "pill", "style callback persists")
 ok(radios["Pill"].checked_func() == true, "checked_func follows persisted choice")
-store.screensaver_banner_style = nil
+ok(radios["Default (from the config file)"].checked_func() == false, "reset unchecked while a pick is stored")
+radios["Default (from the config file)"].callback()
+ok(store.screensaver_banner_style == nil, "reset entry clears the pick")
 
 local role = sub[2].sub_item_table[1] -- Title font
 local list = role.sub_item_table_func()
@@ -229,6 +251,9 @@ ok(#list == 5, "font list = Default + 4 discovered fonts")
 ok(list[1].checked_func() == true, "Default checked when nothing persisted")
 local libron_path = "/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Bold.ttf"
 ok(list[2].text == "Libron_R-Bold.ttf" and list[2].checked_func() == false, "unpicked font unchecked")
+ok(list[2].text == "Libron_R-Bold.ttf" and list[3].text == "Libron_R-Italic.ttf"
+  and list[4].text == "Libron_R-Regular.ttf" and list[5].text == "NotoSans-Regular.ttf",
+  "font picker sorted alphabetically (stub fontlist is deliberately shuffled)")
 list[2].callback()
 ok(store.screensaver_banner_title_font == libron_path, "font pick persists full path")
 ok(list[2].checked_func() == true and not list[1].checked_func(), "checked state follows pick")
@@ -247,6 +272,10 @@ store.screensaver_message_container = "box"
 UIManager:show(w_wrong)
 ok(UIManager.passthrough == 3, "non-banner container passes through")
 store.screensaver_message_container = "banner"
+store.screensaver_type = "image_file"
+UIManager:show(w_wrong)
+ok(UIManager.passthrough == 4, "wrong screensaver_type passes through")
+store.screensaver_type = "cover"
 print("== T4: assembly per style ==")
 
 local function makeWidget(text)
@@ -353,18 +382,19 @@ do
   ok(#cp.widget[2][2][2][1] == 2, "empty-text highlight skipped")
 end
 
+local function used(font)
+  for i = #face_calls, 1, -1 do
+    if face_calls[i].font == font then return true end
+  end
+  return false
+end
+
 print("== T6: font resolution at draw time ==")
 do
   store.screensaver_banner_style = "floating_card"
   sidecar._annotations = {}
   local w = makeWidget()
   UIManager:show(w)
-  local function used(font)
-    for i = #face_calls, 1, -1 do
-      if face_calls[i].font == font then return true end
-    end
-    return false
-  end
   ok(used("/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Bold.ttf"), "title resolved to discovered Libron_R-Bold.ttf path")
   ok(used("cfont"), "stats falls back to cfont alias")
   ok(used("/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Regular.ttf"), "footer resolved to discovered Libron_R-Regular.ttf path")
@@ -391,6 +421,56 @@ do
     ok(#cp.widget[2][2][2][1] == 4, "highlight + footer still assembled")
   end
   sidecar._props = { title = "Test Book", authors = "An Author" }
+end
+
+print("== T8: stale persisted font path falls back to the config default ==")
+do
+  store.screensaver_banner_style = "floating_card"
+  sidecar._annotations = {}
+  -- pick a font, then pretend the file vanished from the device
+  store.screensaver_banner_title_font = "/mnt/us/koreader/fonts/gone/GoneFont.ttf"
+  face_calls = {}
+  local w = makeWidget()
+  UIManager:show(w)
+  ok(used("/mnt/us/koreader/fonts/relaxed-core-fonts/Libron_R-Bold.ttf"),
+    "stale pick falls back to the B_SETT config name, not straight to cfont")
+  store.screensaver_banner_title_font = nil
+end
+
+print("== T9: highlight style filter uses KOReader's real drawer names ==")
+do
+  store.screensaver_banner_style = "floating_card"
+  -- strikeout is a real KOReader drawer but is off in allowed_hl_styles
+  sidecar._annotations = {
+    { text = "struck through note", drawer = "strikeout", datetime = "2025-08-01 12:30", pageno = 7, chapter = "Ch." },
+  }
+  local w, cp = makeWidget()
+  UIManager:show(w)
+  ok(#cp.widget[2][2][2][1] == 2, "strikeout-drawer highlight excluded while the style is off")
+  local f = io.open(here .. "/../2-kobo-style-sleepscreen-banner.lua")
+  local src = f and f:read("*a") or ""
+  if f then f:close() end
+  ok(src:find("strikethrough%s*=%s*false") == nil, "no 'strikethrough' key in allowed_hl_styles (KOReader's drawer is 'strikeout')")
+  ok(src:find("strikeout%s*=%s*false") ~= nil, "strikeout key present in allowed_hl_styles (off by default)")
+end
+
+print("== T10: sleeping with no lastfile must not crash ==")
+do
+  store.screensaver_banner_style = "floating_card"
+  -- a highlight exists, but there is no book (file manager sleep, or no
+  -- book opened yet): getDocSettings(nil) is a hard error on device, so
+  -- the patch must skip the sidecar entirely
+  sidecar._annotations = {
+    { text = "quote without a book", drawer = "underscore", datetime = "2025-08-01 12:30", pageno = 3, chapter = "C" },
+  }
+  store.lastfile = nil
+  local w, cp = makeWidget()
+  local ran, err = pcall(UIManager.show, UIManager, w)
+  ok(ran, "no lastfile: show() survives (" .. tostring(err) .. ")")
+  if ran then
+    ok(#cp.widget[2][2][2][1] == 2, "no lastfile: banner renders without the highlight section")
+  end
+  store.lastfile = "/books/test.epub"
 end
 
 print(string.format("\n%d passed, %d failed", PASS, FAIL))

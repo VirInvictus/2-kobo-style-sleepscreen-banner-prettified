@@ -1,7 +1,8 @@
 # Spec: Kobo-style Sleepscreen Banner (Prettified)
 
-Status: implemented through **v2.1.2**. Reference device: jailbroken Kindle
-PaperWhite 6, KOReader v2026.07.1.
+Status: implemented through **v2.1.4**. Reference device: jailbroken Kindle
+PaperWhite 6, KOReader v2026.07.2 (device-source verifications dated
+2026-09-14 are against this tree).
 
 ## 1. Trigger conditions
 
@@ -10,6 +11,9 @@ PaperWhite 6, KOReader v2026.07.1.
 - widget name == `"ScreenSaver"`
 - `screensaver_show_message` true, `screensaver_message_container` == `"banner"`
 - `screensaver_type` ∈ {`cover`, `document_cover`, `random_image`}
+  (verified against the v2026.07.2 sources: `document_cover` is the
+  "custom image or cover" menu item; the legacy `image_file` value has
+  been migrated to `document_cover` upstream since 2024-04)
 - the banner container exposes the stock TextBoxWidget layout
 
 Everything else passes through untouched.
@@ -27,9 +31,12 @@ overrides set from the menu and win.
 | `screensaver_banner_highlight_font`  | full font path                              | `HL_SETT.highlight_fontFace` |
 | `screensaver_banner_footer_font`     | full font path                              | `HL_SETT.hl_footer_fontFace` |
 
-Font resolution per role: persisted path → config name resolved by basename
-against `fontlist.fontlist` → KOReader alias (`cfont`) → `cfont`. A face
-that fails to load falls back to the KOReader UI font face.
+Font resolution per role, candidates tried in turn: persisted menu path,
+config name resolved by basename against `fontlist.fontlist`, then the
+role's stock fallback (title/stats: the `cfont` alias; footer/highlight:
+`NotoSerif-Regular.ttf` / `NotoSerif-Italic.ttf`). A candidate that fails
+to load falls through to the next; a face that fails everywhere ends at
+the KOReader UI font face.
 
 ## 3. Styles
 
@@ -47,7 +54,9 @@ that fails to load falls back to the KOReader UI font face.
   file browser), registered by wrapping `setUpdateItemTable` on
   `ReaderMenu`/`FileManagerMenu` and inserting the key into the order table
   *before* the original builder runs (MenuSorter drops unlisted items).
-- Submenu: **Message style** (5 radio items) + **Fonts** (4 role pickers).
+- Submenu: **Message style** (a "Default (from the config file)" reset
+  item + the 5 radio items) + **Fonts** (4 role pickers, listed
+  alphabetically by basename).
 - Each font picker lists "Default (from the config file)" plus every path
   in `fontlist.fontlist`, rendered in its own font.
 - Picks persist to `G_reader_settings` and apply from the next sleep.
@@ -55,7 +64,12 @@ that fails to load falls back to the KOReader UI font face.
 ## 5. Highlight behavior
 
 - Eligible annotations: drawer in `HL_SETT.allowed_hl_styles` AND
-  non-empty trimmed text.
+  non-empty trimmed text. Drawer names are KOReader's real ones
+  (`lighten`, `underscore`, `strikeout`, `invert`; verified against the
+  v2026.07.2 sources).
+- With no `lastfile` (sleep from the file manager, or no book opened
+  yet) the sidecar is skipped entirely and the highlight section stays
+  off; `DocSettings:open(nil)` is a hard error on device.
 - If none survive, the entire highlight section (accent rule, quote,
   footer) is skipped.
 - The shown highlight is randomized but never repeats back-to-back.

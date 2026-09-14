@@ -1,0 +1,15 @@
+name: harness
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lua 5.4 and LuaJIT
+        run: sudo apt-get update && sudo apt-get install -y lua5.4 luajit
+      - name: Run the harness under Lua 5.4
+        run: lua5.4 test/harness.lua
+      - name: Run the harness under LuaJIT
+        run: luajit test/harness.lua

@@ -1,5 +1,15 @@
 # Patch Notes
 
+## v2.1.4
+*   **Fixed: strikeout highlights could never be allowed.** The highlight style filter keyed `strikethrough`, but KOReader's drawer is `strikeout` (verified against the v2026.07.2 device sources), so the key never matched anything: strikeout highlights were always excluded and setting it true did nothing. The key now uses the real drawer name, still off by default, so nothing changes until you opt in.
+*   **Fixed: sleeping with no book no longer crashes.** Sleeping from the file manager, or before any book was opened, has no `lastfile`, and KOReader's `DocSettings:open(nil)` is a hard error (verified against the device sources). The banner now draws with just the title and stats lines; the highlight section simply stays off.
+*   **New: the Message style pick can be undone.** A "Default (from the config file)" entry now sits at the top of Message style, mirroring the font roles' reset; it clears the menu pick so the `style` set in `B_SETT` takes over again.
+*   **New: font pickers list fonts alphabetically** instead of in filesystem order, so big font collections are actually browsable.
+*   **Fixed: a removed menu font pick no longer skips the config default.** If a font picked in the menu later vanished from the device, resolution jumped straight to the stock alias (`cfont`); it now tries the still-valid `B_SETT` config name first.
+*   **The random highlight pick is seeded.** Unseeded, LuaJIT repeats the same "random" sequence after every reboot; the patch now seeds the RNG once at load.
+*   **Text polish**: the Pill style's picker help text reads with a colon instead of an em-dash.
+*   For developers: CI now runs the harness under both Lua 5.4 and LuaJIT on every push. The wallpaper-enum guard was verified against the device sources and is correct as-is (`document_cover` is KOReader's "custom image or cover"; the old `image_file` value was migrated away upstream in 2024-04); only README wording was aligned. Internal: consistent `Sidecar` guarding in the footer parser, the UI instance kept in a patch local instead of on the UIManager singleton, corrected comments. Harness grown to 70 checks.
+
 ## v2.1.3
 *   **Fixed: crash when a substituted value contains a `%`.** If the footer template pulls in the chapter, author or title tokens (`%C`, `%A`, `%T`) and that metadata holds a literal percent sign ("The 100% Solution"), the footer's text substitution errored out and took the sleep-screen draw down with it. Substitution values are now inserted literally instead of being read as gsub replacement strings.
 

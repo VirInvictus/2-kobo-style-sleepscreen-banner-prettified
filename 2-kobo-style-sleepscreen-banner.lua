@@ -2,6 +2,21 @@
 --redesigns the inbuilt 'banner' type sleep screen message to
 --make it look like the kobo lockscreen tag.
 
+--[ v2.1.4 ]
+--fix: the highlight style filter keyed "strikethrough"; KOReader's
+--drawer is "strikeout", so the key never matched (drawer names verified
+--against the v2026.07.2 device sources; still off by default)
+--fix: sleeping with no lastfile (from the file manager, or before any
+--book was opened) crashed in DocSettings:open(nil); the banner now
+--draws without the highlight section instead
+--menu: "Default (from the config file)" resets the Message style pick;
+--font pickers list their fonts alphabetically
+--fix: a removed menu font pick now falls back to the config default
+--before the stock alias instead of jumping straight to it
+--the random highlight pick is seeded (unseeded, LuaJIT repeats the
+--same sequence after every reboot)
+--pill help text dash recast; guard/comment cleanups
+
 --[ v2.1.3 ]
 --fix: a '%' in a substituted footer value (chapter/author/title tokens)
 --crashed the substitution; values are now inserted literally
@@ -71,12 +86,12 @@ local HL_SETT = {	--HIGHLIGHT SETTINGS
 										-- %T = title, 
 										-- \n = line break
 												
-					allowed_hl_styles = { 	-- only 'true' styles will be shown
-									lighten = true,
-									underscore = true,
-									strikethrough = false,
-									invert = false,
-					}
+									allowed_hl_styles = { 	-- only 'true' styles will be shown
+													lighten = true,
+													underscore = true,
+													strikeout = false,
+													invert = false,
+									}
 }
 
 local Bb = require("ffi/blitbuffer")
@@ -105,14 +120,23 @@ local VerticalSpan = require("ui/widget/verticalspan")
 local screen_w, screen_h = Screen:getWidth(), Screen:getHeight()
 local cached_random_highlight_index  = 1
 local Sidecar
+local ui_instance	--the live ReaderUI/FileManager instance, kept in a
+					--patch local: writing it on the UIManager singleton
+					--left it parked there after wake
+--seed the RNG once: unseeded, LuaJIT repeats the same "random"
+--highlight sequence after every reboot
+math.randomseed(os.time())
 
 --==================================================================
 -- BANNER STYLES (v2.1.0)
 -- Each style is a set of chrome parameters used when the card is
 -- assembled at the bottom of UIManager:show. The user's pick (made
--- in Settings > Screen > Sleep Screen > Banner style) is stored in
+-- in Settings > Banner style) is stored in
 -- G_reader_settings and wins over B_SETT.style.
 --==================================================================
+--user-facing strings go through gettext's global _; identity fallback
+--for when patches run before that global is loaded (strings then pass
+--through untranslated instead of erroring)
 local _ = _ or function(str) return str end
 
 local STYLE_DEFS = {
@@ -162,7 +186,7 @@ local STYLE_DEFS = {
 
 local BANNER_STYLE_ITEMS = {
 	{ id = "floating_card",	text = _("Floating card"),	help_text = _("Rounded card with a hard offset drop shadow (default).") },
-	{ id = "pill",			text = _("Pill"),			help_text = _("Fully rounded lozenge — the ends get extra padding so the text stays well inside the caps.") },
+	{ id = "pill",			text = _("Pill"),			help_text = _("Fully rounded lozenge: the ends get extra padding so the text stays well inside the caps.") },
 	{ id = "full_width",	text = _("Full width"),		help_text = _("Classic banner spanning the whole screen, flush against the edges, no shadow.") },
 	{ id = "outlined",		text = _("Outlined"),		help_text = _("Minimal ghost card: extra-thick 5 px border, no drop shadow.") },
 	{ id = "bracketed",		text = _("Flat box"),		help_text = _("Solid backing behind the text: no border, corners or shadow.") },
@@ -209,9 +233,23 @@ local function resolveFontPath(name)
 end
 
 local function getFontFace(setting_key, config_name, size, fallback_alias, fallback_size)
-	local face = Font:getFace(resolveFontPath(G_reader_settings:readSetting(setting_key)) or
-							resolveFontPath(config_name) or
-							fallback_alias, size)
+	--candidates in turn: menu pick, then the B_SETT config name (a
+	--removed menu pick must not demote the user past a still-valid
+	--default), then the stock alias. numeric loop: the first candidate
+	--is nil with no menu pick, and ipairs would stop on that hole.
+	local face
+	local candidates = {
+		resolveFontPath(G_reader_settings:readSetting(setting_key)),
+		resolveFontPath(config_name),
+		fallback_alias,
+	}
+	for i = 1, 3 do
+		local name = candidates[i]
+		if name then
+			face = Font:getFace(name, size)
+			if face then break end
+		end
+	end
 	return face or Font:getFace(fallback_alias, fallback_size)
 end
 --------------------------------------------------------------------
@@ -241,7 +279,22 @@ local function getFontRoleBaseName(role)
 end
 
 local function buildStyleItems()
-	local items = {}
+	--reset entry first: a menu pick can always be undone, mirroring the
+	--font roles' "Default (from the config file)". with no pick persisted,
+	--the B_SETT.style radio also shows checked: it IS the active look.
+	local items = {
+			{
+					text = _("Default (from the config file)"),
+					help_text = _("Clear the menu pick and use the style set in B_SETT.style."),
+					checked_func = function()
+						return G_reader_settings:readSetting("screensaver_banner_style") == nil
+					end,
+					callback = function()
+						G_reader_settings:delSetting("screensaver_banner_style")
+					end,
+					radio = true,
+			},
+	}
 	for _, item in ipairs(BANNER_STYLE_ITEMS) do
 		table.insert(items, {
 				text = item.text,
@@ -277,23 +330,32 @@ local function buildFontRoleItem(role)
 						},
 				}
 				if FontList and type(FontList.fontlist) == "table" then
+					--sorted by basename so pickers are usable with big
+					--font collections (fontlist order is filesystem-order)
+					local fonts = {}
 					for _, path in ipairs(FontList.fontlist) do
 						if type(path) == "string" then
 							local base = path:match("([^/\\]+)$") or path
-							table.insert(items, {
-									text = base,
-									checked_func = function()
-										return G_reader_settings:readSetting(role.key) == path
-									end,
-									callback = function()
-										G_reader_settings:saveSetting(role.key, path)
-									end,
-									font_func = function(size)
-										return Font:getFace(path, size)
-									end,
-									radio = true,
-							})
+							table.insert(fonts, { base = base, path = path })
 						end
+					end
+					table.sort(fonts, function(a, b)
+						return a.base:lower() < b.base:lower()
+					end)
+					for _, font in ipairs(fonts) do
+						table.insert(items, {
+								text = font.base,
+								checked_func = function()
+									return G_reader_settings:readSetting(role.key) == font.path
+								end,
+								callback = function()
+									G_reader_settings:saveSetting(role.key, font.path)
+								end,
+								font_func = function(size)
+									return Font:getFace(font.path, size)
+								end,
+								radio = true,
+						})
 					end
 				end
 				return items
@@ -441,7 +503,7 @@ local function parseFooterText(text, index)
 	local hl_array = Sidecar and Sidecar:readSetting("annotations")
 	hl_array = hl_array and hl_array[index] or {}
 	hl_chapter = hl_array.chapter or "N/A"
-	hl_pageno = Sidecar:isTrue("pagemap_use_page_labels") and hl_array.pageref or 
+	hl_pageno = Sidecar and Sidecar:isTrue("pagemap_use_page_labels") and hl_array.pageref or
 				hl_array.pageno or "N/A"
 				
 	local doc_props = Sidecar and Sidecar:readSetting("doc_props") or {}
@@ -504,10 +566,11 @@ end
 local og_uiMan_show = UIManager.show
 
 function UIManager:show(widget, ...)
-	-- if widget isn't 'screensaver' or if wallpaper type
-	-- isn't 'book cover' or 'custom image' or if sleep screen message type
-	-- isn't 'banner', we do not intercept. 
-	
+	-- if widget isn't 'screensaver' or if the wallpaper type isn't one of
+	-- cover / document_cover (KOReader's "custom image or cover") /
+	-- random_image, or if the sleep screen message container isn't
+	-- 'banner', we do not intercept.
+
 	if not widget or widget.name ~= "ScreenSaver" then 
 		return og_uiMan_show(self, widget, ...)
 	end
@@ -538,10 +601,15 @@ function UIManager:show(widget, ...)
 	--=================================
 	
 	local last_file = G_reader_settings:readSetting("lastfile")
-	Sidecar = BookList.getDocSettings(last_file)
-	self.ui = require("apps/reader/readerui").instance or 
+	--sleeping from the file manager, or before any book was opened, has
+	--no lastfile, and DocSettings:open(nil) is a hard error on device
+	--(it crashes in getSidecarFilename): no book, no sidecar.
+	Sidecar = last_file and BookList.getDocSettings(last_file) or nil
+	ui_instance = require("apps/reader/readerui").instance or
 				require("apps/filemanager/filemanager").instance
-	Sidecar:flush()
+	if Sidecar then
+		Sidecar:flush()
+	end
 	
 	--dimen roundup. the active banner style resolves the card chrome
 	--(padding, margin, border, radius) before anything is laid out.
@@ -597,7 +665,7 @@ function UIManager:show(widget, ...)
 	local highlightCount, highlightEnabled, highlights_list
 	
 	if HL_SETT.showRandomHighlight then
-		local all_annotations = Sidecar:readSetting("annotations") or {}
+		local all_annotations = Sidecar and Sidecar:readSetting("annotations") or {}
 		highlights_list = {}
 
 		local allowed = HL_SETT.allowed_hl_styles
@@ -625,8 +693,8 @@ function UIManager:show(widget, ...)
 	-- Pre-calculate texts to expand max_wid if a word is too long
 	local title_text
 	
-	if self.ui and self.ui.document and self.ui.toc and self.ui.bookinfo then
-		title_text = self.ui and self.ui.bookinfo:expandString(B_SETT.title_text, last_file) or "N/A"
+	if ui_instance and ui_instance.document and ui_instance.toc and ui_instance.bookinfo then
+		title_text = ui_instance.bookinfo:expandString(B_SETT.title_text, last_file) or "N/A"
 	else
 		title_text = BookInfo:expandString(B_SETT.title_text, last_file) or "N/A"
 	end

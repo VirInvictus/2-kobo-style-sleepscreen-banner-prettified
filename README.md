@@ -37,7 +37,7 @@ Everything sits inside an opaque, rounded, shadowed card. The card is drawn once
 
 The patch only takes over when the stock sleep screen is configured as a message-over-cover banner. In KOReader set:
 
-- **Screensaver → Wallpaper**: `Book cover`, `Random image`, or `Custom image` (`document_cover`, `random_image`, or `cover`).
+- **Screensaver → Wallpaper**: `Show book cover on sleep screen`, `Show custom image or cover on sleep screen`, or `Show random image from folder on sleep screen` (`cover`, `document_cover`, or `random_image`; verified against KOReader v2026.07.2).
 - **Screensaver → Message**: enabled.
 - **Screensaver → Message position/style**: the `banner` container.
 
@@ -79,11 +79,11 @@ All options live in the two tables at the top of the `.lua` file. Edit, save, re
 
 ### Banner styles
 
-Open **Settings → Banner style**, a top-level entry at the bottom of the Settings tab (it shows up in the file browser's settings too, next to the stock "Sleep screen" entry). Inside you get **Message style** (the five looks below) and **Fonts** (see [Banner fonts](#banner-fonts)). The choice is saved with KOReader's settings and applies from the next sleep, no restart needed. If you have never picked one there, the `style` value in `B_SETT` is used instead.
+Open **Settings → Banner style**, a top-level entry at the bottom of the Settings tab (it shows up in the file browser's settings too, next to the stock "Sleep screen" entry). Inside you get **Message style** (the five looks below, plus a "Default (from the config file)" entry that clears the pick again) and **Fonts** (see [Banner fonts](#banner-fonts)). The choice is saved with KOReader's settings and applies from the next sleep, no restart needed. If you have never picked one there, or cleared the pick, the `style` value in `B_SETT` is used instead.
 
 ### Banner fonts
 
-Under **Banner style → Fonts** you can pick the font for each of the four text roles (title, stats, highlight and footer) from every font file KOReader can see (each entry renders in its own font). The pick is saved with KOReader's settings; choose "Default (from the config file)" to go back to the `B_SETT` values. Resolution is by font *file* name, in any subdirectory of `koreader/fonts/`, so collection-specific layouts (e.g. `relaxed-core-fonts/Libron_R-Bold.ttf`) work as-is.
+Under **Banner style → Fonts** you can pick the font for each of the four text roles (title, stats, highlight and footer) from every font file KOReader can see, listed alphabetically (each entry renders in its own font). The pick is saved with KOReader's settings; choose "Default (from the config file)" to go back to the `B_SETT` values. Resolution is by font *file* name, in any subdirectory of `koreader/fonts/`, so collection-specific layouts (e.g. `relaxed-core-fonts/Libron_R-Bold.ttf`) work as-is.
 
 | Style | Look |
 | --- | --- |
@@ -107,7 +107,7 @@ Under **Banner style → Fonts** you can pick the font for each of the four text
 | `hl_footer_fontFace` | `"Libron_R-Regular.ttf"` | Font for the footer. |
 | `hl_footer_fontSize` | `15` | |
 | `hl_footer_text` | `"saved on %DT at %HM"` | Footer template (see tokens below). |
-| `allowed_hl_styles` | lighten, underscore | Which highlight drawer styles are eligible to be shown. |
+| `allowed_hl_styles` | `lighten`, `underscore` on; `strikeout`, `invert` off | Which highlight drawer styles are eligible to be shown (KOReader drawer names; only `true` entries are shown). |
 
 ### Footer tokens
 

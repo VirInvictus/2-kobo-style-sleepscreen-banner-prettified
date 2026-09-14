@@ -22,8 +22,18 @@ semantics), tab-indented, and deliberately one drop-in file.
 - `Font:getFace(path, size)` accepts full paths; `fontlist.fontlist` is an
   array of discovered full paths. Resolve user picks by full path, config
   names by basename lookup against that list, fall back to `cfont`.
+- KOReader's highlight drawer name is `strikeout`, never `strikethrough`
+  (the v2.1.4 fix; `allowed_hl_styles` must key the real drawer names).
+- Device-verified against the v2026.07.2 frontend sources (2026-09-14):
+  `BookList.getDocSettings(nil)` is a hard error (`DocSettings:open`
+  crashes in `getSidecarFilename`), so the patch skips the sidecar when
+  `lastfile` is unset; the legal `screensaver_type` values for the banner
+  are `cover` / `document_cover` (KOReader's "custom image or cover";
+  the old `image_file` was migrated to it upstream in 2024-04) /
+  `random_image`; the Strikethrough highlight menu item stores the drawer
+  string `strikeout` (`readerhighlight.lua`).
 
-## Device workflow (jailbroken Kindle PaperWhite 6, KOReader v2026.07.1)
+## Device workflow (jailbroken Kindle PaperWhite 6, KOReader v2026.07.2)
 
 - KOReader's built-in SSH server: port **2222**, user `root`, "no password"
   mode: an empty password is rejected but ANY non-empty string works
@@ -51,11 +61,15 @@ semantics), tab-indented, and deliberately one drop-in file.
   child, per-side padding, size aggregation). A stub that silently
   "fixes" wrong patch behavior will hide device crashes.
 - Syntax gate: `luac -p 2-kobo-style-sleepscreen-banner.lua`.
+- CI (`.github/workflows/harness.yml`) runs the suite under both
+  interpreters on every push.
 
 ## Conventions
 
 - Tabs; `snake_case` settings; user-facing strings wrapped in `_()`.
-- Version bumps touch: patch header comment + `patchnotes.md`.
+- Version bumps touch: the patch header comment (the single source for
+  the version), `patchnotes.md`, the spec status line, and README where
+  it mentions behavior.
 - Docs travel with code: README.md (users), spec.md (behavior spec),
   patchnotes.md (history), CLAUDE.md (this file; AGENTS.md is a symlink to it).
 - Commit + push after every verified on-device change.
