@@ -1,0 +1,76 @@
+# project.done — 2-kobo-style-sleepscreen-banner-prettified
+
+Completed: 2026-09-14 (THE FINAL BLITZ). Commit range ad73373..project.done
+on main (v2.1.4 release commit: eb628a6), pushed to
+VirInvictus/2-kobo-style-sleepscreen-banner-prettified.
+
+## What shipped (v2.1.4)
+
+- `allowed_hl_styles` now keys KOReader's real `strikeout` drawer name
+  (the old `strikethrough` key could never match); verified against the
+  device's v2026.07.2 frontend sources (`readerhighlight.lua`).
+- Sleeping with no `lastfile` (file manager, or no book opened yet) no
+  longer crashes: `DocSettings:open(nil)` is a hard error on device
+  (crashes in `getSidecarFilename`), so the patch now skips the sidecar
+  and draws the banner without the highlight section.
+- The wallpaper-enum finding was arbitrated and CORRECTED: the patch's
+  enum (`cover` / `document_cover` / `random_image`) was already right;
+  `document_cover` is KOReader's "custom image or cover" and the legacy
+  `image_file` value was migrated away upstream in 2024-04. Only README
+  wording and the code comment were aligned.
+- New: a "Default (from the config file)" reset entry for Message style
+  (a style pick is now undoable from the menu).
+- New: font pickers list fonts alphabetically by basename.
+- A removed menu font pick falls back to the still-valid B_SETT config
+  name before the stock alias.
+- The random highlight pick is seeded (unseeded LuaJIT repeated its
+  sequence across reboots).
+- Internal: one Sidecar guard posture in parseFooterText, the UI instance
+  kept in a patch local (not on the UIManager singleton), corrected
+  comments, the Pill help string recast (no em-dash).
+- Docs: the 24-line prose em-dash sweep across README/roadmap/patchnotes/
+  CLAUDE/spec plus the shipped help string; spec status line at v2.1.4;
+  README compat-shim claim replaced with what actually degrades;
+  RESEARCH_STYLES.md bannered as historical; .clinerules reference
+  dropped; device reference corrected to KOReader v2026.07.2; roadmap
+  audit block fully ticked with dated notes.
+- Tests: harness grown 58 -> 70 checks (wrong-screensaver_type
+  pass-through, stale-font fallback, strikeout filter matching, reset
+  entry, alphabetical sort, no-lastfile guard), green under Lua 5.4 AND
+  LuaJIT locally, and enforced by the new CI workflow
+  (.github/workflows/harness.yml, first run green).
+
+## Tags / releases
+
+- v2.1.4: annotated tag at eb628a6, message = the full patchnotes entry
+  verbatim (cat-file verified), GitHub Release created from it.
+- v2.1.3: recut per Brandon's explicit go (force-push class, push state
+  verified first): now carries the full v2.0.3-v2.1.3 catch-up span
+  verbatim, same release commit (7e7da93), tag force-pushed, GitHub
+  Release recreated from the new tag (body verified verbatim).
+- v2.0.2-vir.1: left as record (Brandon's history window; rewriting
+  buys nothing user-visible and the message carries the fork provenance).
+
+## Questions asked and answers (2026-09-14)
+
+1. Kindle session timing -> "kindle is mount to /mnt/Kindle" (device
+   sources available; read-only arbitrations executed against
+   v2026.07.2).
+2. v2.1.3 catch-up retag -> approved (retag with full span).
+3. v2.0.2-vir.1 paraphrase tag -> no explicit answer in the answered
+   batch; left as record per the report's own recommendation.
+4. Optional CI workflow -> approved (added).
+5. S features (style reset entry, alphabetical font sort) -> both
+   approved (both shipped).
+
+## Reopen conditions
+
+- On-device visual pass per banner style (Brandon's hands on the
+  Kindle). v2.1.4 is NOT yet deployed to the device: deploy is the
+  documented exec-channel command in CLAUDE.md, then a full KOReader
+  restart, then sleep/wake through the five styles. No code change is
+  expected; this is verification only.
+- The v2.0.2-vir.1 paraphrase tag remains a historical record; retagging
+  it is a force-push-class action requiring a future explicit go.
+- Nothing else: every finding on the FINAL-REPORT ranked list is
+  executed, answered-gate-executed, or recorded above.
