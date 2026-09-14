@@ -4,8 +4,8 @@
 *   **Fixed: crash when a substituted value contains a `%`.** If the footer template pulls in the chapter, author or title tokens (`%C`, `%A`, `%T`) and that metadata holds a literal percent sign ("The 100% Solution"), the footer's text substitution errored out and took the sleep-screen draw down with it. Substitution values are now inserted literally instead of being read as gsub replacement strings.
 
 ## v2.1.2
-*   **Pill**: the ends now get extra side padding — up to the cap radius, as far as the screen allows — so the text sits on the straight section of the lozenge and is always fully backed, never spilling onto the curves.
-*   **Bracketed redesigned into "Flat box"**: the rules-on-the-cover look is gone. It's now a plain solid backing behind the text — no border, no rounded corners, no shadow — so author names and quotes stay readable (settings id unchanged).
+*   **Pill**: the ends now get extra side padding (up to the cap radius, as far as the screen allows) so the text sits on the straight section of the lozenge and is always fully backed, never spilling onto the curves.
+*   **Bracketed redesigned into "Flat box"**: the rules-on-the-cover look is gone. It's now a plain solid backing behind the text (no border, no rounded corners, no shadow) so author names and quotes stay readable (settings id unchanged).
 *   **Outlined**: border thickened 3 px → 5 px.
 
 ## v2.1.1
@@ -16,8 +16,8 @@
 
 
 ## v2.1.0
-*   **Selectable banner styles**: new `style` default in `B_SETT` plus a "Banner style" radio picker injected into Settings → Screen → Sleep screen. Five looks: floating card (as before), pill, full-width, outlined, and bracketed. The menu choice is saved in KOReader's settings and applies from the next sleep — no restart.
-*   **No highlight, no section**: when a book has no eligible highlights (or the parser comes up empty), the highlight block — accent line, quote and footer — is skipped entirely instead of rendering an empty accent line with a blank space next to it.
+*   **Selectable banner styles**: new `style` default in `B_SETT` plus a "Banner style" radio picker injected into Settings → Screen → Sleep screen. Five looks: floating card (as before), pill, full-width, outlined, and bracketed. The menu choice is saved in KOReader's settings and applies from the next sleep, no restart.
+*   **No highlight, no section**: when a book has no eligible highlights (or the parser comes up empty), the highlight block (accent line, quote and footer) is skipped entirely instead of rendering an empty accent line with a blank space next to it.
 
 ## v2.0.3
 *   **Dynamic Banner Expansion**: Added a dynamic width calculator that checks the length of the longest word in the title, stats, highlight, and footer. If a single word (like "Conversations") exceeds the configured default card width, the card will stretch up to the screen's edge to accommodate it rather than wrapping and breaking the word mid-way.

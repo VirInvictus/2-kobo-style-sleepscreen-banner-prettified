@@ -1,4 +1,4 @@
-# Spec — Kobo-style Sleepscreen Banner (Prettified)
+# Spec: Kobo-style Sleepscreen Banner (Prettified)
 
 Status: implemented through **v2.1.2**. Reference device: jailbroken Kindle
 PaperWhite 6, KOReader v2026.07.1.

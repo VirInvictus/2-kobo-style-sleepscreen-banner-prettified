@@ -1,5 +1,11 @@
 # Research: KOReader Settings Menus and Box Styles
 
+> **Historical research, written before implementation (pre-v2.1.0).** Kept
+> for the record only; it does not describe what shipped. The real styles,
+> borders and menu wiring live in spec.md and the patch: the "3-5px" example
+> below predates the 5 px border v2.1.0 actually shipped, and the Bracketed
+> rules-look was retired in v2.1.2 (now the "Flat box").
+
 ## 1. Adding Menu Items in KOReader
 
 To expose settings in KOReader (like letting the user toggle between "styles" of boxes), the standard plugin architecture uses the `addToMainMenu` function.
