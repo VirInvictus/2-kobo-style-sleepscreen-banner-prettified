@@ -1,5 +1,7 @@
 # Kobo-style Sleepscreen Banner (Prettified)
 
+> **Status: complete and stable.** Bug reports welcome; feature development is closed.
+
 A [KOReader](https://koreader.rocks) user patch that redesigns the built-in "banner" sleep-screen message into a Kobo-lockscreen-style **floating card** laid over your book cover. The card shows the book title, reading progress, and (optionally) a random highlight pulled from the book you were last reading.
 
 This is a *prettified* fork of an existing community patch. It keeps the original banner behaviour and adds:
